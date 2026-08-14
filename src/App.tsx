@@ -8,8 +8,8 @@ export default function App() {
       {/* Fills the viewport; Fit.Contain centres the artboard within it. */}
       <RiveScene
         src="/rive/mainhub.riv"
-        artboard="SunArtboard"
-        stateMachines="SunStateMachine"
+        artboard="MainVM"
+        stateMachines="State Machine 1"
         className="fixed inset-0 h-full w-full"
       />
       <main className="pointer-events-none relative z-10 mx-auto max-w-3xl px-6 py-24">
