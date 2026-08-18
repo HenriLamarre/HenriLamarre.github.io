@@ -7,7 +7,8 @@ type RiveSceneProps = {
   src: string
   artboard?: string
   stateMachines?: string
-  /** Cover by default: scale the artboard to fill the viewport, cropping. */
+  /** Cover by default: Fit.Layout leaves the artboard laid out at its authored
+   *  size unless the file's constraints stretch, so the scene drifts off-screen. */
   fit?: Fit
   className?: string
 }
@@ -36,14 +37,6 @@ export default function RiveScene({
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-
-    // Size the backing store before constructing Rive. Otherwise the renderer
-    // initialises its surface against the canvas' default 300x150 and the
-    // artboard is laid out against those dimensions.
-    const rect = canvas.getBoundingClientRect()
-    const dpr = window.devicePixelRatio || 1
-    canvas.width = Math.round(rect.width * dpr)
-    canvas.height = Math.round(rect.height * dpr)
 
     const instance = new Rive({
       src,

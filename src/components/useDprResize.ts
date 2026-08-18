@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from 'react'
-import { Fit, type Rive } from '@rive-app/webgl2'
+import { type Rive } from '@rive-app/webgl2'
 
 /**
  * Keeps a Rive drawing surface matched to its canvas.
@@ -11,11 +11,6 @@ import { Fit, type Rive } from '@rive-app/webgl2'
  * window to a monitor with different scaling); and a ResizeObserver on the
  * canvas itself catches layout changes that never touch the window, including
  * the first paint where the element may still have been zero-sized.
- *
- * Under Fit.Layout the artboard is resized to the surface rather than scaled
- * to fit it, so its dimensions have to be pushed back in after every resync —
- * in artboard units, i.e. surface pixels divided by the pixel ratio actually
- * used and the layout scale factor.
  */
 export function useDprResize(
   rive: Rive | null,
@@ -26,18 +21,10 @@ export function useDprResize(
 
     let mql: MediaQueryList | null = null
 
-    const sync = () => {
-      rive.resizeDrawingSurfaceToCanvas()
-
-      const canvas = canvasRef?.current
-      if (canvas && rive.layout.fit === Fit.Layout) {
-        const scale = rive.devicePixelRatioUsed * rive.layout.layoutScaleFactor
-        if (scale > 0) {
-          rive.artboardWidth = canvas.width / scale
-          rive.artboardHeight = canvas.height / scale
-        }
-      }
-    }
+    // Under Fit.Layout this also resizes the artboard itself to the surface —
+    // do not set artboardWidth/Height alongside it, or the artboard is sized
+    // twice and its centre drifts off the viewport centre.
+    const sync = () => rive.resizeDrawingSurfaceToCanvas()
 
     const onChange = () => {
       sync()
