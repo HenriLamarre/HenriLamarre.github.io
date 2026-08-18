@@ -7,6 +7,7 @@ type RiveSceneProps = {
   src: string
   artboard?: string
   stateMachines?: string
+  /** Cover by default: the artboard is 2:1, browser windows rarely are. */
   fit?: Fit
   className?: string
 }
@@ -26,7 +27,7 @@ export default function RiveScene({
   src,
   artboard,
   stateMachines,
-  fit = Fit.Contain,
+  fit = Fit.Cover,
   className,
 }: RiveSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -56,7 +57,7 @@ export default function RiveScene({
     }
   }, [src, artboard, stateMachines, fit])
 
-  useDprResize(rive)
+  useDprResize(rive, canvasRef)
 
   return <canvas ref={canvasRef} className={className} />
 }

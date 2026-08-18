@@ -1,14 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, type RefObject } from 'react'
+
+type Resizable = { resizeDrawingSurfaceToCanvas: () => void }
 
 /**
- * Keeps a Rive drawing surface sharp when the device pixel ratio changes —
- * e.g. dragging the window between monitors with different DPR/scaling.
+ * Keeps a Rive drawing surface matched to its canvas.
  *
- * Rive resizes its surface on window `resize` events, but a pure DPR change
- * (same logical size, different pixel density) doesn't always fire one. We
- * also watch a `matchMedia` resolution query and re-sync on change.
+ * Rive sizes its surface from the canvas' CSS box times the device pixel
+ * ratio, so the surface has to be re-synced whenever either changes. A window
+ * `resize` covers viewport changes; a `matchMedia` resolution query catches a
+ * pure DPR change (same logical size, different density — e.g. dragging the
+ * window to a monitor with different scaling); and a ResizeObserver on the
+ * canvas itself catches layout changes that never touch the window, including
+ * the first paint where the element may still have been zero-sized.
  */
-export function useDprResize(rive: { resizeDrawingSurfaceToCanvas: () => void } | null) {
+export function useDprResize(
+  rive: Resizable | null,
+  canvasRef?: RefObject<HTMLCanvasElement | null>,
+) {
   useEffect(() => {
     if (!rive) return
 
@@ -27,11 +35,19 @@ export function useDprResize(rive: { resizeDrawingSurfaceToCanvas: () => void } 
 
     window.addEventListener('resize', onChange)
     subscribe()
+
+    const canvas = canvasRef?.current
+    const observer = canvas
+      ? new ResizeObserver(() => rive.resizeDrawingSurfaceToCanvas())
+      : null
+    if (canvas && observer) observer.observe(canvas)
+
     rive.resizeDrawingSurfaceToCanvas() // initial sync
 
     return () => {
       window.removeEventListener('resize', onChange)
       mql?.removeEventListener('change', onChange)
+      observer?.disconnect()
     }
-  }, [rive])
+  }, [rive, canvasRef])
 }
