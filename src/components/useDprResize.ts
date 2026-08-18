@@ -1,6 +1,5 @@
 import { useEffect, type RefObject } from 'react'
-
-type Resizable = { resizeDrawingSurfaceToCanvas: () => void }
+import { Fit, type Rive } from '@rive-app/webgl2'
 
 /**
  * Keeps a Rive drawing surface matched to its canvas.
@@ -12,9 +11,14 @@ type Resizable = { resizeDrawingSurfaceToCanvas: () => void }
  * window to a monitor with different scaling); and a ResizeObserver on the
  * canvas itself catches layout changes that never touch the window, including
  * the first paint where the element may still have been zero-sized.
+ *
+ * Under Fit.Layout the artboard is resized to the surface rather than scaled
+ * to fit it, so its dimensions have to be pushed back in after every resync —
+ * in artboard units, i.e. surface pixels divided by the pixel ratio actually
+ * used and the layout scale factor.
  */
 export function useDprResize(
-  rive: Resizable | null,
+  rive: Rive | null,
   canvasRef?: RefObject<HTMLCanvasElement | null>,
 ) {
   useEffect(() => {
@@ -22,8 +26,21 @@ export function useDprResize(
 
     let mql: MediaQueryList | null = null
 
-    const onChange = () => {
+    const sync = () => {
       rive.resizeDrawingSurfaceToCanvas()
+
+      const canvas = canvasRef?.current
+      if (canvas && rive.layout.fit === Fit.Layout) {
+        const scale = rive.devicePixelRatioUsed * rive.layout.layoutScaleFactor
+        if (scale > 0) {
+          rive.artboardWidth = canvas.width / scale
+          rive.artboardHeight = canvas.height / scale
+        }
+      }
+    }
+
+    const onChange = () => {
+      sync()
       subscribe() // DPR may have changed — re-bind to the new resolution query
     }
 
@@ -37,12 +54,10 @@ export function useDprResize(
     subscribe()
 
     const canvas = canvasRef?.current
-    const observer = canvas
-      ? new ResizeObserver(() => rive.resizeDrawingSurfaceToCanvas())
-      : null
+    const observer = canvas ? new ResizeObserver(sync) : null
     if (canvas && observer) observer.observe(canvas)
 
-    rive.resizeDrawingSurfaceToCanvas() // initial sync
+    sync() // initial sync
 
     return () => {
       window.removeEventListener('resize', onChange)
