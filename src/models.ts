@@ -12,13 +12,24 @@ export type ModelEntry = {
 export const MODELS: ModelEntry[] = [
   {
     url: '/models/Model1.glb',
-    label: 'Model 1',
-    description: 'Add a sentence or two about this model here.',
-    // link: { href: 'https://github.com/HenriLamarre/…', label: 'Voir le projet' },
+    label: 'La Soupe aux Choux',
+    description: 'Modèle procédural généré sur Blender dans le cadre de la compétition Dérapage 2025.',
+    link: { href: 'https://www.youtube.com/watch?v=cvYGijhQTRI', label: 'Vidéo  ' },
   },
   {
     url: '/models/Model2.glb',
-    label: 'Model 2',
-    description: 'And another description here.',
+    label: 'Spaghettification : aux origines du quotidien et de l\'infini',
+    description: 'Un des modèles générés sur Blender pour la compétition Dérapage 2026.',
+    link: { href: 'https://www.youtube.com/watch?v=XWf_XqVtyIc', label: 'Vidéo  ' },
+  },
+  {
+    url: '/models/Model3.glb',
+    label: 'Typhon',
+    description: 'Expérimentation procédurale de géometry nodes dans Blender.',
+  },
+  {
+    url: '/models/Model4.glb',
+    label: 'Ore',
+    description: 'Prototype de tuiles et de ressource dans un projet de jeu vidéo.',
   },
 ]

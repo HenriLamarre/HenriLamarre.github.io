@@ -12,6 +12,11 @@ const RADIUS = 3.2
  * rather than a row.
  */
 const TILT = 0.22
+/**
+ * Vertical offset of the whole ring, in world units. Raised to clear the
+ * label and description that sit along the bottom of the screen.
+ */
+const LIFT = 0.55
 const FRONT_SCALE = 1.35
 const BACK_SCALE = 0.6
 /** Horizontal pixels of drag needed to advance one model. */
@@ -155,7 +160,7 @@ export default function ModelCarousel({ models, index, onIndexChange }: ModelCar
   return (
     // Outer group holds the tilt; the inner one spins, so the tilt stays put
     // instead of wobbling as the ring turns.
-    <group rotation={[TILT, 0, 0]} position={[0, -0.35, -RADIUS]}>
+    <group rotation={[TILT, 0, 0]} position={[0, LIFT, -RADIUS]}>
       <group ref={ringRef}>
         {models.map((entry, i) => (
           <CarouselItem
