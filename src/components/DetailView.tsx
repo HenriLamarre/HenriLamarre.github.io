@@ -1,10 +1,8 @@
-import { Component, Suspense, type ReactNode } from 'react'
+import { Component, Suspense, useState, type ReactNode } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF } from '@react-three/drei'
+import ModelCarousel from './ModelCarousel'
+import { MODELS } from '../models'
 import type { Selection } from './RiveScene'
-
-/** Drop a .glb here to replace the placeholder geometry. */
-const MODEL_URL = '/models/modelisation.glb'
 
 const LABELS: Record<Selection, string> = {
   jeux: 'Jeux',
@@ -23,30 +21,20 @@ function readableInk(background: string): string {
   return luminance > 0.55 ? '#101010' : '#f4f4f6'
 }
 
-function Model() {
-  const { scene } = useGLTF(MODEL_URL)
-  return <primitive object={scene} />
-}
-
-function Placeholder() {
-  return (
-    <mesh rotation={[0.4, 0.6, 0]}>
-      <icosahedronGeometry args={[1.3, 0]} />
-      <meshStandardMaterial color="#d8d8e0" flatShading />
-    </mesh>
-  )
-}
-
-/** Falls back to placeholder geometry when no .glb has been supplied yet. */
-class ModelBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+/** Keeps a broken or missing .glb from taking down the whole view. */
+class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
 
   static getDerivedStateFromError() {
     return { failed: true }
   }
 
+  componentDidCatch(error: unknown) {
+    console.error('[carousel] failed to render:', error)
+  }
+
   render() {
-    return this.state.failed ? <Placeholder /> : this.props.children
+    return this.state.failed ? null : this.props.children
   }
 }
 
@@ -58,22 +46,27 @@ type DetailViewProps = {
 
 export default function DetailView({ selection, background, onBack }: DetailViewProps) {
   const ink = readableInk(background)
+  const [index, setIndex] = useState(0)
+  const showModels = selection === 'modelisation' && MODELS.length > 0
+
+  const step = (direction: number) =>
+    setIndex((current) => (current + direction + MODELS.length) % MODELS.length)
 
   return (
     <div
       className="fixed inset-0 z-20 animate-[fade-in_250ms_ease-out]"
       style={{ background }}
     >
-      {selection === 'modelisation' && (
+      {showModels && (
         <Canvas camera={{ position: [0, 0, 4] }} gl={{ alpha: true }} dpr={[1, 2]}>
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[3, 3, 4]} intensity={1.4} />
+          <ambientLight intensity={0.7} />
+          <directionalLight position={[3, 4, 5]} intensity={1.5} />
+          <directionalLight position={[-4, -2, -3]} intensity={0.4} />
           <Suspense fallback={null}>
-            <ModelBoundary>
-              <Model />
-            </ModelBoundary>
+            <SceneBoundary>
+              <ModelCarousel models={MODELS} index={index} onIndexChange={setIndex} />
+            </SceneBoundary>
           </Suspense>
-          <OrbitControls enableZoom={false} enablePan={false} enableDamping />
         </Canvas>
       )}
 
@@ -83,6 +76,72 @@ export default function DetailView({ selection, background, onBack }: DetailView
       >
         {LABELS[selection]}
       </h2>
+
+      {showModels && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-12 flex flex-col items-center gap-3 px-8">
+          <p className="font-display text-2xl" style={{ color: ink }}>
+            {MODELS[index].label}
+          </p>
+
+          {MODELS[index].description && (
+            <p
+              className="max-w-md text-center text-sm leading-relaxed opacity-80"
+              style={{ color: ink }}
+            >
+              {MODELS[index].description}
+            </p>
+          )}
+
+          {MODELS[index].link && (
+            <a
+              href={MODELS[index].link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pointer-events-auto border-b text-sm opacity-80 transition hover:opacity-100"
+              style={{ color: ink, borderColor: ink + '77' }}
+            >
+              {MODELS[index].link.label} ↗
+            </a>
+          )}
+
+          {MODELS.length > 1 && (
+            <div className="pointer-events-auto flex items-center gap-6">
+              <button
+                type="button"
+                aria-label="Modèle précédent"
+                onClick={() => step(-1)}
+                className="font-display text-3xl leading-none opacity-70 transition hover:opacity-100"
+                style={{ color: ink }}
+              >
+                ‹
+              </button>
+
+              <div className="flex gap-2">
+                {MODELS.map((model, i) => (
+                  <button
+                    key={model.url}
+                    type="button"
+                    aria-label={model.label}
+                    onClick={() => setIndex(i)}
+                    className="h-2 w-2 rounded-full transition"
+                    style={{ background: ink, opacity: i === index ? 1 : 0.35 }}
+                  />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                aria-label="Modèle suivant"
+                onClick={() => step(1)}
+                className="font-display text-3xl leading-none opacity-70 transition hover:opacity-100"
+                style={{ color: ink }}
+              >
+                ›
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <button
         type="button"
