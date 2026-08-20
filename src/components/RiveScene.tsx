@@ -22,11 +22,41 @@ const PLANET_BY_PROPERTY = {
 
 export type Selection = (typeof PLANET_BY_PROPERTY)[keyof typeof PLANET_BY_PROPERTY] | 'sun'
 
+/** Each scene's background comes from the matching MainVM colour property. */
+const COLOR_PROPERTY: Record<Selection, string> = {
+  jeux: 'JeuxColor',
+  modelisation: 'ModelisationColor',
+  enseignement: 'EnseignementColor',
+  sun: 'SunColor',
+}
+
+export type SelectionPayload = {
+  target: Selection
+  /** CSS colour read from MainVM, e.g. "rgb(255, 216, 65)". */
+  background: string
+}
+
 type NumberProp = { value: number }
-type Instance = { number: (name: string) => NumberProp | null }
+type ColorProp = { value: number }
+type Instance = {
+  number: (name: string) => NumberProp | null
+  color: (name: string) => ColorProp | null
+}
+
+/** Rive stores colours as 0xAARRGGBB. */
+function argbToCss(value: number): string {
+  const n = value >>> 0
+  const a = (n >>> 24) & 0xff
+  const r = (n >>> 16) & 0xff
+  const g = (n >>> 8) & 0xff
+  const b = n & 0xff
+  return a === 0xff
+    ? `rgb(${r}, ${g}, ${b})`
+    : `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`
+}
 
 type RiveSceneProps = {
-  onSelect: (selection: Selection) => void
+  onSelect: (selection: SelectionPayload) => void
   /** Hidden behind a detail view: stop animating rather than unmounting. */
   paused?: boolean
 }
@@ -96,15 +126,29 @@ export default function RiveScene({ onSelect, paused = false }: RiveSceneProps) 
       return best
     }
 
+    /** Report a selection along with its colour from MainVM. */
+    const select = (target: Selection) => {
+      const instance = rive.viewModelInstance as unknown as Instance | null
+      const raw = instance?.color(COLOR_PROPERTY[target])?.value
+      onSelectRef.current({
+        target,
+        background: raw === undefined ? '#000000' : argbToCss(raw),
+      })
+    }
+
     const onRiveEvent = (event: Event) => {
       const name = (event.data as { name?: string } | undefined)?.name
-      if (name === 'SunClick') {
-        onSelectRef.current('sun')
+
+      // Tolerate naming variants: "SunClick", "planet clicked", "Planet_Click".
+      const key = name?.toLowerCase().replace(/[^a-z]/g, '') ?? ''
+
+      if (key.includes('sun')) {
+        select('sun')
         return
       }
-      if (name === 'PlanetClick') {
+      if (key.includes('planet')) {
         const planet = selectedPlanet()
-        if (planet) onSelectRef.current(planet)
+        if (planet) select(planet)
       }
     }
 

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from 'react'
-import RiveScene, { type Selection } from './components/RiveScene'
+import RiveScene, { type SelectionPayload } from './components/RiveScene'
 import Starfield from './components/Starfield'
 
 // Three.js is only needed once a planet is clicked, so keep it out of the
@@ -7,7 +7,7 @@ import Starfield from './components/Starfield'
 const DetailView = lazy(() => import('./components/DetailView'))
 
 export default function App() {
-  const [selection, setSelection] = useState<Selection | null>(null)
+  const [selection, setSelection] = useState<SelectionPayload | null>(null)
 
   return (
     <div className="relative min-h-dvh bg-void text-star">
@@ -18,7 +18,11 @@ export default function App() {
 
       {selection && (
         <Suspense fallback={null}>
-          <DetailView selection={selection} onBack={() => setSelection(null)} />
+          <DetailView
+            selection={selection.target}
+            background={selection.background}
+            onBack={() => setSelection(null)}
+          />
         </Suspense>
       )}
     </div>
