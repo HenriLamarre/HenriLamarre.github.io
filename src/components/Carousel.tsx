@@ -11,6 +11,7 @@ import {
   type Texture,
 } from 'three'
 import type { CarouselItem } from '../content/types'
+import { useTextTexture } from './useTextTexture'
 
 /** How far the ring sits from its centre, in world units. */
 const RADIUS = 3.2
@@ -64,7 +65,18 @@ function useNormalisedModel(url: string): Object3D {
  * A two-sided card. BoxGeometry groups run +X, -X, +Y, -Y, +Z, -Z, so the
  * front image goes on material 4 and the back on material 5.
  */
-function Card({ front, back, plainBack }: { front: string; back?: string; plainBack: string }) {
+type CardProps = {
+  front: string
+  back?: string
+  abstract?: string
+  title: string
+  /** Card edges, and the panel colour behind abstract text. */
+  plainBack: string
+  /** Scene background, used as the ink on that panel. */
+  accent: string
+}
+
+function Card({ front, back, abstract, title, plainBack, accent }: CardProps) {
   const urls = back ? [front, back] : [front]
   const loaded = useTexture(urls)
   const textures = (Array.isArray(loaded) ? loaded : [loaded]) as Texture[]
@@ -80,17 +92,26 @@ function Card({ front, back, plainBack }: { front: string; back?: string; plainB
       : { width: CARD_SIZE * aspect, height: CARD_SIZE }
   }, [textures])
 
+  // An abstract is printed on the back when there is no back artwork.
+  const textTexture = useTextTexture(
+    !back && abstract
+      ? { title, body: abstract, width, height, fill: plainBack, ink: accent }
+      : null,
+  )
+
   const materials = useMemo(() => {
     for (const texture of textures) texture.colorSpace = SRGBColorSpace
 
     const edge = new MeshStandardMaterial({ color: plainBack, roughness: 0.8 })
     const frontFace = new MeshStandardMaterial({ map: textures[0], roughness: 0.6 })
-    const backFace = textures[1]
-      ? new MeshStandardMaterial({ map: textures[1], roughness: 0.6 })
+
+    const backMap = textures[1] ?? textTexture
+    const backFace = backMap
+      ? new MeshStandardMaterial({ map: backMap, roughness: 0.6 })
       : new MeshStandardMaterial({ color: plainBack, roughness: 0.7 })
 
     return [edge, edge, edge, edge, frontFace, backFace]
-  }, [textures, plainBack])
+  }, [textures, textTexture, plainBack])
 
   return (
     <mesh material={materials}>
@@ -110,10 +131,11 @@ type SlotProps = {
   isFront: boolean
   spinRef: React.RefObject<number>
   plainBack: string
+  accent: string
   onGrab: () => void
 }
 
-function Slot({ item, angle, isFront, spinRef, plainBack, onGrab }: SlotProps) {
+function Slot({ item, angle, isFront, spinRef, plainBack, accent, onGrab }: SlotProps) {
   const groupRef = useRef<Group>(null)
 
   useFrame((_, delta) => {
@@ -129,12 +151,24 @@ function Slot({ item, angle, isFront, spinRef, plainBack, onGrab }: SlotProps) {
   })
 
   return (
-    <group position={[Math.sin(angle) * RADIUS, 0, Math.cos(angle) * RADIUS]}>
+    // Rotating each slot by its own angle cancels the ring's rotation for the
+    // item at the front, so its face squares up to the viewer.
+    <group
+      position={[Math.sin(angle) * RADIUS, 0, Math.cos(angle) * RADIUS]}
+      rotation={[0, angle, 0]}
+    >
       <group ref={groupRef} onPointerDown={isFront ? onGrab : undefined}>
         {item.kind === 'model' ? (
           <ModelObject url={item.url} />
         ) : (
-          <Card front={item.front} back={item.back} plainBack={plainBack} />
+          <Card
+            front={item.front}
+            back={item.back}
+            abstract={item.abstract}
+            title={item.label}
+            plainBack={plainBack}
+            accent={accent}
+          />
         )}
       </group>
     </group>
@@ -147,9 +181,17 @@ type CarouselProps = {
   onIndexChange: (index: number) => void
   /** Colour used for card edges and for backs with no artwork. */
   plainBack: string
+  /** Scene background, used as the ink on printed backs. */
+  accent: string
 }
 
-export default function Carousel({ items, index, onIndexChange, plainBack }: CarouselProps) {
+export default function Carousel({
+  items,
+  index,
+  onIndexChange,
+  plainBack,
+  accent,
+}: CarouselProps) {
   const ringRef = useRef<Group>(null)
   const spinRef = useRef(0)
   const grabbedItem = useRef(false)
@@ -235,6 +277,7 @@ export default function Carousel({ items, index, onIndexChange, plainBack }: Car
             isFront={i === index}
             spinRef={spinRef}
             plainBack={plainBack}
+            accent={accent}
             onGrab={() => {
               grabbedItem.current = true
             }}

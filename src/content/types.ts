@@ -21,7 +21,10 @@ export type ModelItem = BaseItem & {
 export type CardItem = BaseItem & {
   kind: 'card'
   front: string
+  /** Back artwork. Takes precedence over `abstract` if both are given. */
   back?: string
+  /** Text printed on the back instead of artwork — an abstract, a summary. */
+  abstract?: string
 }
 
 export type CarouselItem = ModelItem | CardItem

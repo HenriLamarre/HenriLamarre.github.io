@@ -72,6 +72,7 @@ export default function DetailView({ selection, background, onBack }: DetailView
                 index={index}
                 onIndexChange={setIndex}
                 plainBack={ink}
+                accent={background}
               />
             </SceneBoundary>
           </Suspense>
