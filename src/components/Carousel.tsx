@@ -27,10 +27,15 @@ const BACK_SCALE = 0.6
 /** Horizontal pixels of drag needed to advance one item. */
 const SWIPE_THRESHOLD = 60
 
-/** Playing-card proportions: 2.5 x 3.5 inches. */
-const CARD_HEIGHT = 2
-const CARD_WIDTH = CARD_HEIGHT * (2.5 / 3.5)
+/**
+ * Longest side of a card, in world units — the same envelope models are
+ * normalised to, so cards and models sit at a consistent size in the ring.
+ * The other side follows the image's own aspect ratio.
+ */
+const CARD_SIZE = 2
 const CARD_DEPTH = 0.04
+/** Used only if an image's dimensions can't be read. */
+const FALLBACK_ASPECT = 2.5 / 3.5
 
 /**
  * Normalises a loaded model: centred on the origin and scaled so its longest
@@ -64,6 +69,17 @@ function Card({ front, back, plainBack }: { front: string; back?: string; plainB
   const loaded = useTexture(urls)
   const textures = (Array.isArray(loaded) ? loaded : [loaded]) as Texture[]
 
+  // Take the card's proportions from the front image itself.
+  const { width, height } = useMemo(() => {
+    const image = textures[0]?.image as { width?: number; height?: number } | undefined
+    const aspect =
+      image?.width && image?.height ? image.width / image.height : FALLBACK_ASPECT
+
+    return aspect >= 1
+      ? { width: CARD_SIZE, height: CARD_SIZE / aspect }
+      : { width: CARD_SIZE * aspect, height: CARD_SIZE }
+  }, [textures])
+
   const materials = useMemo(() => {
     for (const texture of textures) texture.colorSpace = SRGBColorSpace
 
@@ -78,7 +94,7 @@ function Card({ front, back, plainBack }: { front: string; back?: string; plainB
 
   return (
     <mesh material={materials}>
-      <boxGeometry args={[CARD_WIDTH, CARD_HEIGHT, CARD_DEPTH]} />
+      <boxGeometry args={[width, height, CARD_DEPTH]} />
     </mesh>
   )
 }
