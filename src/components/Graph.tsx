@@ -83,6 +83,20 @@ const TITLE_MARGIN = 26
 /** Quiet period after the last resize event before the layout resumes. */
 const RESIZE_SETTLE_MS = 200
 
+/**
+ * The cursor drags stars along very slightly, as if it were magnetic. Kept
+ * weak and short-range on purpose: any stronger and the stars slide away from
+ * under the pointer, which makes them hard to click.
+ */
+const POINTER_RADIUS = 110
+const POINTER_STRENGTH = 0.12
+/** Ceiling on one frame of cursor travel, so a flick cannot fling anything. */
+const POINTER_MAX_STEP = 18
+/** How quickly the cursor's momentum fades once it stops moving. */
+const POINTER_DECAY = 0.6
+/** Keeps the layout ticking briefly after the cursor stops. */
+const POINTER_IDLE_MS = 220
+
 type SimNode = SimulationNodeDatum & GraphNode
 type SimLink = SimulationLinkDatum<SimNode>
 
@@ -123,6 +137,9 @@ export default function Graph() {
   const dragRef = useRef<{ id: string; moved: number; lastX: number; lastY: number } | null>(
     null,
   )
+
+  /** Cursor position, and how far it moved since the last frame. */
+  const pointerRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, active: false })
 
   /** Latest size, read by the forces so they never close over a stale value. */
   const sizeRef = useRef({ width: 0, height: 0 })
@@ -253,6 +270,28 @@ export default function Graph() {
           }
         }
       })
+      // A faint magnetic wake: stars near the cursor drift with it, fading out
+      // with distance. The star being dragged is left alone.
+      .force('pointer', () => {
+        const pointer = pointerRef.current
+        if (!pointer.active) return
+
+        for (const node of simNodes) {
+          if (node.id === dragRef.current?.id) continue
+
+          const dx = (node.x ?? 0) - pointer.x
+          const dy = (node.y ?? 0) - pointer.y
+          const distance = Math.hypot(dx, dy)
+          if (distance > POINTER_RADIUS) continue
+
+          const falloff = 1 - distance / POINTER_RADIUS
+          node.vx = (node.vx ?? 0) + pointer.dx * falloff * POINTER_STRENGTH
+          node.vy = (node.vy ?? 0) + pointer.dy * falloff * POINTER_STRENGTH
+        }
+
+        pointer.dx *= POINTER_DECAY
+        pointer.dy *= POINTER_DECAY
+      })
       // The title block holds the top left corner while it is visible.
       .force('title', () => {
         if (selectedRef.current) return
@@ -317,7 +356,50 @@ export default function Graph() {
 
     simulationRef.current = simulation
 
+    // The layout cools to a stop, so the wake needs a small nudge to have
+    // anything to act on — but only a nudge, or the graph would reshuffle.
+    const element = containerRef.current
+    const clamp = (value: number) =>
+      Math.max(-POINTER_MAX_STEP, Math.min(POINTER_MAX_STEP, value))
+
+    let idleTimer: number | undefined
+
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = element?.getBoundingClientRect()
+      if (!rect) return
+
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
+      const pointer = pointerRef.current
+
+      if (pointer.active) {
+        pointer.dx += clamp(x - pointer.x)
+        pointer.dy += clamp(y - pointer.y)
+      }
+      pointer.x = x
+      pointer.y = y
+      pointer.active = true
+
+      // Hold the simulation just above its resting point while the cursor
+      // moves, otherwise it settles between events and the wake never runs.
+      simulation.alphaTarget(0.02).restart()
+      window.clearTimeout(idleTimer)
+      idleTimer = window.setTimeout(() => simulation.alphaTarget(0), POINTER_IDLE_MS)
+    }
+
+    const onPointerLeave = () => {
+      pointerRef.current.active = false
+      window.clearTimeout(idleTimer)
+      simulation.alphaTarget(0)
+    }
+
+    element?.addEventListener('pointermove', onPointerMove)
+    element?.addEventListener('pointerleave', onPointerLeave)
+
     return () => {
+      window.clearTimeout(idleTimer)
+      element?.removeEventListener('pointermove', onPointerMove)
+      element?.removeEventListener('pointerleave', onPointerLeave)
       simulation.stop()
       simulationRef.current = null
     }
@@ -532,7 +614,7 @@ export default function Graph() {
                   setDragging(true)
                 }}
                 className={`transition-opacity duration-300 ${
-                  dragging ? 'cursor-grabbing' : 'cursor-grab'
+                  dragging ? 'cursor-grabbing' : 'cursor-pointer'
                 }`}
                 opacity={dimmed ? 0.25 : 1}
               >
@@ -591,7 +673,7 @@ export default function Graph() {
             <div className="min-w-0">
               {/* Categories this entry belongs to, as clickable tags. */}
               {parentCategories.length > 0 && (
-                <nav className="mb-1 flex flex-wrap items-center gap-2 font-mono text-xs">
+                <nav className="font-pixel mb-1 flex flex-wrap items-center gap-2 text-sm tracking-[0.1em]">
                   {parentCategories.map((category, i) => (
                     <span key={category.id} className="flex items-center gap-2">
                       {i > 0 && <span className="text-[#7d6f45]">/</span>}
@@ -619,14 +701,36 @@ export default function Graph() {
             <button
               type="button"
               onClick={() => setSelected(null)}
-              className="grid aspect-square shrink-0 place-items-center border border-white/25 leading-none text-slate-300 transition hover:border-white/70 hover:bg-white/10 hover:text-white"
-              style={{
-                width: 'clamp(38px, 3.4vw, 60px)',
-                fontSize: 'clamp(20px, 1.8vw, 30px)',
-              }}
+              className="relative aspect-square shrink-0 border border-white/25 text-slate-300 transition hover:border-white/70 hover:bg-white/10 hover:text-white"
+              style={{ width: 'clamp(38px, 3.4vw, 60px)' }}
               aria-label="Fermer"
             >
-              ×
+              {/* Two diagonals spanning the box, corner to corner. */}
+              <svg
+                aria-hidden
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                className="absolute inset-0 h-full w-full"
+              >
+                <line
+                  x1="0"
+                  y1="0"
+                  x2="100"
+                  y2="100"
+                  stroke="currentColor"
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+                <line
+                  x1="100"
+                  y1="0"
+                  x2="0"
+                  y2="100"
+                  stroke="currentColor"
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
             </button>
           </header>
 
@@ -669,9 +773,6 @@ export default function Graph() {
 
             {relatedApplications.length > 0 && (
               <section>
-                <h3 className="font-pixel text-xs tracking-[0.2em] text-[#c9b98a] uppercase">
-                  Applications
-                </h3>
                 <ul className="mt-3 space-y-1">
                   {relatedApplications.map((application) => (
                     <li key={application.id}>

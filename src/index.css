@@ -39,6 +39,19 @@ html {
   color-scheme: dark;
 }
 
+/* Browsers default buttons to an arrow; anything clickable should show the
+   pointing hand. */
+button,
+a,
+[role="button"],
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
 /* Nothing in the window is editable, so a caret is never wanted — clicking
    anywhere in it, including beside the close button, should not show one. */
 .hud-panel,
