@@ -300,6 +300,23 @@ export default function Graph() {
 
   return (
     <div ref={containerRef} className="relative h-dvh w-full overflow-hidden bg-black">
+      {/* Site title, top left. Fades out while a window is open. */}
+      <header
+        className={`pointer-events-none absolute top-8 left-10 z-10 font-pixel transition-opacity duration-300 ${
+          selected ? 'opacity-0' : 'opacity-100'
+        }`}
+      >
+        <h1
+          className="text-2xl tracking-[0.14em] text-[#fff6dc]"
+          style={{ textShadow: '0 0 12px rgba(255, 219, 130, 0.55)' }}
+        >
+          Henri Lamarre
+        </h1>
+        <p className="mt-2 font-mono text-sm tracking-wide text-[#c9b98a]">
+          Ph.D. in Astrophysics, Game Developper
+        </p>
+      </header>
+
       {/* A press that reaches the background — i.e. not a star, not the window
           — closes whatever is open. */}
       <svg
@@ -425,10 +442,11 @@ export default function Graph() {
             <h2 className="font-pixel text-2xl tracking-[0.12em] uppercase">
               {selectedNode.name}
             </h2>
+            {/* Generous hit area, so the close target is easy to hit. */}
             <button
               type="button"
               onClick={() => setSelected(null)}
-              className="font-pixel text-xl leading-none text-slate-300 transition hover:text-white"
+              className="-mt-1 -mr-2 grid h-12 w-12 shrink-0 place-items-center border border-white/20 text-2xl leading-none text-slate-300 transition hover:border-white/60 hover:bg-white/10 hover:text-white"
               aria-label="Fermer"
             >
               ×
@@ -443,7 +461,7 @@ export default function Graph() {
           />
 
           {/* Scrolls independently, so a project can carry as much as it needs. */}
-          <div className="hud-scroll relative min-h-0 flex-1 overflow-y-auto px-8 py-6">
+          <div className="hud-scroll relative min-h-0 flex-1 overflow-y-auto px-8 py-6 font-mono">
             {selectedNode.description && (
               <p className="text-base leading-relaxed text-slate-300">
                 {selectedNode.description}
