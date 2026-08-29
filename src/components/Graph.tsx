@@ -24,12 +24,17 @@ const BOUNDS = { left: 28, right: 110, top: 34, bottom: 28 }
 /** Velocity kept when a star hits a wall. Below 1, so walls absorb energy. */
 const RESTITUTION = 0.35
 
+/** Below this width, windows take a much larger share of the screen. */
+const MOBILE_BREAKPOINT = 768
+
 /** An application's window fills most of the screen; it holds real content. */
 const PANEL_LARGE_RATIO = { width: 0.75, height: 0.7 }
-/** A category's window is just a menu, so it stays small. */
+const PANEL_LARGE_RATIO_MOBILE = { width: 0.92, height: 0.85 }
+/** A category's window is just a menu, so on desktop it stays small. */
 const PANEL_MIN = { width: 300, height: 220 }
 const PANEL_MAX = { width: 440, height: 400 }
 const PANEL_RATIO = { width: 0.3, height: 0.46 }
+const PANEL_RATIO_MOBILE = { width: 0.88, height: 0.5 }
 /**
  * Where the window sits: centred in the viewport. Anchoring it to its star
  * created a feedback loop — the window moved the stars, which moved the star
@@ -37,18 +42,26 @@ const PANEL_RATIO = { width: 0.3, height: 0.46 }
  * this, so what pushes the stars is exactly what is drawn.
  */
 function panelRect(viewport: { width: number; height: number }, kind: NodeKind) {
+  const mobile = viewport.width < MOBILE_BREAKPOINT
+
+  // On a phone there is no room to spare, so both kinds take far more of the
+  // screen and the desktop caps on the menu no longer apply.
+  const large = mobile ? PANEL_LARGE_RATIO_MOBILE : PANEL_LARGE_RATIO
+  const menu = mobile ? PANEL_RATIO_MOBILE : PANEL_RATIO
+
   const width =
     kind === 'application'
-      ? viewport.width * PANEL_LARGE_RATIO.width
-      : Math.min(PANEL_MAX.width, Math.max(PANEL_MIN.width, viewport.width * PANEL_RATIO.width))
+      ? viewport.width * large.width
+      : mobile
+        ? viewport.width * menu.width
+        : Math.min(PANEL_MAX.width, Math.max(PANEL_MIN.width, viewport.width * menu.width))
 
   const height =
     kind === 'application'
-      ? viewport.height * PANEL_LARGE_RATIO.height
-      : Math.min(
-          PANEL_MAX.height,
-          Math.max(PANEL_MIN.height, viewport.height * PANEL_RATIO.height),
-        )
+      ? viewport.height * large.height
+      : mobile
+        ? viewport.height * menu.height
+        : Math.min(PANEL_MAX.height, Math.max(PANEL_MIN.height, viewport.height * menu.height))
 
   return {
     width,
@@ -554,7 +567,7 @@ export default function Graph() {
 
       {selectedNode && (
         <article
-          className="hud-panel absolute flex flex-col bg-[#0a0702]/88 text-slate-100 backdrop-blur-md"
+          className="hud-panel absolute flex flex-col bg-[#0a0702]/72 text-slate-100 backdrop-blur-md"
           style={{
             ...panelRect(size, selectedNode.kind),
             position: 'absolute',
