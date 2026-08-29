@@ -9,7 +9,7 @@ import {
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from 'd3-force'
-import { LINKS, NODES, type GraphNode } from '../graph/data'
+import { LINKS, NODES, type GraphNode, type NodeKind } from '../graph/data'
 
 /** Star size by kind: categories are the bright ones. */
 const RADIUS = { category: 7, application: 3.5 } as const
@@ -24,14 +24,47 @@ const BOUNDS = { left: 28, right: 110, top: 34, bottom: 28 }
 /** Velocity kept when a star hits a wall. Below 1, so walls absorb energy. */
 const RESTITUTION = 0.35
 
-/** The open window, as a fraction of the viewport. */
-const PANEL_WIDTH_RATIO = 0.75
-const PANEL_HEIGHT_RATIO = 0.7
+/** An application's window fills most of the screen; it holds real content. */
+const PANEL_LARGE_RATIO = { width: 0.75, height: 0.7 }
+/** A category's window is just a menu, so it stays small. */
+const PANEL_MIN = { width: 300, height: 220 }
+const PANEL_MAX = { width: 440, height: 400 }
+const PANEL_RATIO = { width: 0.3, height: 0.46 }
+/**
+ * Where the window sits: centred in the viewport. Anchoring it to its star
+ * created a feedback loop — the window moved the stars, which moved the star
+ * holding the window, which moved the window. The forces and the DOM both use
+ * this, so what pushes the stars is exactly what is drawn.
+ */
+function panelRect(viewport: { width: number; height: number }, kind: NodeKind) {
+  const width =
+    kind === 'application'
+      ? viewport.width * PANEL_LARGE_RATIO.width
+      : Math.min(PANEL_MAX.width, Math.max(PANEL_MIN.width, viewport.width * PANEL_RATIO.width))
+
+  const height =
+    kind === 'application'
+      ? viewport.height * PANEL_LARGE_RATIO.height
+      : Math.min(
+          PANEL_MAX.height,
+          Math.max(PANEL_MIN.height, viewport.height * PANEL_RATIO.height),
+        )
+
+  return {
+    width,
+    height,
+    left: (viewport.width - width) / 2,
+    top: (viewport.height - height) / 2,
+  }
+}
 /** Clearance kept between the window's edge and any star. */
 const PANEL_MARGIN = 48
 /** How hard stars are pushed out of the window's footprint. Gentle, so they
  *  ease out instead of overshooting and bouncing back in. */
 const PANEL_PUSH = 0.045
+/** The category menu is small and transient, so it barely disturbs the sky. */
+const CATEGORY_MARGIN = 14
+const CATEGORY_PUSH = 0.018
 /** Clearance around the title block. */
 const TITLE_MARGIN = 26
 /** Quiet period after the last resize event before the layout resumes. */
@@ -230,19 +263,22 @@ export default function Graph() {
           else node.vy = (node.vy ?? 0) + toBottom * PANEL_PUSH
         }
       })
-      // The open window is a rectangle in the middle of the viewport. Push any
-      // star inside it out by its shortest route, so the graph reorganises
-      // around the window rather than behind it.
+      // The open window is a rectangle carried by its star. Push any other star
+      // inside it out by its shortest route, so the graph opens up around it.
       .force('panel', () => {
-        if (!selectedRef.current) return
+        const openId = selectedRef.current
+        if (!openId) return
 
-        const { width, height } = sizeRef.current
-        const panelWidth = width * PANEL_WIDTH_RATIO
-        const panelHeight = height * PANEL_HEIGHT_RATIO
-        const left = (width - panelWidth) / 2 - PANEL_MARGIN
-        const right = (width + panelWidth) / 2 + PANEL_MARGIN
-        const top = (height - panelHeight) / 2 - PANEL_MARGIN
-        const bottom = (height + panelHeight) / 2 + PANEL_MARGIN
+        const kind = NODES.find((node) => node.id === openId)?.kind ?? 'application'
+        // The small menu barely intrudes, so it should barely push.
+        const margin = kind === 'category' ? CATEGORY_MARGIN : PANEL_MARGIN
+        const push = kind === 'category' ? CATEGORY_PUSH : PANEL_PUSH
+
+        const rect = panelRect(sizeRef.current, kind)
+        const left = rect.left - margin
+        const right = rect.left + rect.width + margin
+        const top = rect.top - margin
+        const bottom = rect.top + rect.height + margin
 
         for (const node of simNodes) {
           const x = node.x ?? 0
@@ -255,10 +291,10 @@ export default function Graph() {
           const toBottom = bottom - y
           const shortest = Math.min(toLeft, toRight, toTop, toBottom)
 
-          if (shortest === toLeft) node.vx = (node.vx ?? 0) - toLeft * PANEL_PUSH
-          else if (shortest === toRight) node.vx = (node.vx ?? 0) + toRight * PANEL_PUSH
-          else if (shortest === toTop) node.vy = (node.vy ?? 0) - toTop * PANEL_PUSH
-          else node.vy = (node.vy ?? 0) + toBottom * PANEL_PUSH
+          if (shortest === toLeft) node.vx = (node.vx ?? 0) - toLeft * push
+          else if (shortest === toRight) node.vx = (node.vx ?? 0) + toRight * push
+          else if (shortest === toTop) node.vy = (node.vy ?? 0) - toTop * push
+          else node.vy = (node.vy ?? 0) + toBottom * push
         }
       })
       .on('tick', () => {
@@ -360,6 +396,15 @@ export default function Graph() {
   }, [])
 
   const selectedNode = nodes.find((node) => node.id === selected) ?? null
+
+  /** For a category, the applications hanging off it — listed in its window. */
+  const relatedApplications = useMemo(() => {
+    const node = NODES.find((candidate) => candidate.id === selected)
+    if (!node || node.kind !== 'category') return []
+    return NODES.filter(
+      (candidate) => candidate.kind === 'application' && neighbours.has(candidate.id),
+    )
+  }, [selected, neighbours])
 
   return (
     <div ref={containerRef} className="relative h-dvh w-full overflow-hidden bg-black">
@@ -491,11 +536,8 @@ export default function Graph() {
         <article
           className="hud-panel absolute flex flex-col bg-[#0a0702]/88 text-slate-100 backdrop-blur-md"
           style={{
-            width: `${PANEL_WIDTH_RATIO * 100}%`,
-            height: `${PANEL_HEIGHT_RATIO * 100}%`,
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
+            ...panelRect(size, selectedNode.kind),
+            position: 'absolute',
             border: '1px solid rgba(255, 246, 214, 0.85)',
             boxShadow:
               '0 0 10px rgba(255, 219, 130, 0.45), 0 0 34px rgba(255, 190, 60, 0.22), inset 0 0 26px rgba(255, 214, 120, 0.07)',
@@ -544,17 +586,22 @@ export default function Graph() {
 
           {/* Scrolls independently, so a project can carry as much as it needs. */}
           <div className="hud-scroll relative min-h-0 flex-1 overflow-y-auto px-8 py-6 font-mono">
-            {selectedNode.description && (
-              <p className="text-base leading-relaxed text-slate-300">
-                {selectedNode.description}
-              </p>
-            )}
+            {/* Categories are just a way in: their window is the list below. */}
+            {selectedNode.kind === 'application' && (
+              <>
+                {selectedNode.description && (
+                  <p className="text-sm leading-relaxed text-slate-300">
+                    {selectedNode.description}
+                  </p>
+                )}
 
-            {selectedNode.body?.map((paragraph, i) => (
-              <p key={i} className="mt-4 text-sm leading-relaxed text-slate-400">
-                {paragraph}
-              </p>
-            ))}
+                {selectedNode.body?.map((paragraph, i) => (
+                  <p key={i} className="mt-4 text-sm leading-relaxed text-slate-400">
+                    {paragraph}
+                  </p>
+                ))}
+              </>
+            )}
 
             {selectedNode.link && (
               <a
@@ -565,6 +612,35 @@ export default function Graph() {
               >
                 {selectedNode.link.label} ↗
               </a>
+            )}
+
+            {relatedApplications.length > 0 && (
+              <section>
+                <h3 className="font-pixel text-xs tracking-[0.2em] text-[#c9b98a] uppercase">
+                  Applications
+                </h3>
+                <ul className="mt-3 space-y-1">
+                  {relatedApplications.map((application) => (
+                    <li key={application.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelected(application.id)}
+                        className="group flex w-full items-baseline gap-3 border-b border-white/10 py-2 text-left transition hover:border-white/40"
+                      >
+                        <span className="text-[#c9b98a] transition group-hover:text-[#fff6dc]">
+                          →
+                        </span>
+                        <span className="text-[#fff6dc]">{application.name}</span>
+                        {application.description && (
+                          <span className="ml-auto truncate pl-6 text-xs text-[#a8975f]">
+                            {application.description}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
           </div>
         </article>
