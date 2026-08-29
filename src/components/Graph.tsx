@@ -384,7 +384,7 @@ export default function Graph() {
           className="mt-2 font-mono tracking-wide text-[#c9b98a]"
           style={{ fontSize: 'clamp(11px, 0.95vw, 17px)' }}
         >
-          Ph.D. in Astrophysics, Game Developper
+          Ph.D. in Astrophysics, Game Developer
         </p>
       </header>
 
