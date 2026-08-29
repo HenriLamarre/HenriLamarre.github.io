@@ -32,6 +32,10 @@ const PANEL_MARGIN = 48
 /** How hard stars are pushed out of the window's footprint. Gentle, so they
  *  ease out instead of overshooting and bouncing back in. */
 const PANEL_PUSH = 0.045
+/** Clearance around the title block. */
+const TITLE_MARGIN = 26
+/** Quiet period after the last resize event before the layout resumes. */
+const RESIZE_SETTLE_MS = 200
 
 type SimNode = SimulationNodeDatum & GraphNode
 type SimLink = SimulationLinkDatum<SimNode>
@@ -74,6 +78,12 @@ export default function Graph() {
     null,
   )
 
+  /** Latest size, read by the forces so they never close over a stale value. */
+  const sizeRef = useRef({ width: 0, height: 0 })
+  /** Title box in container coordinates, so stars can be kept out of it. */
+  const titleRef = useRef<HTMLElement>(null)
+  const titleBoxRef = useRef({ x: 0, y: 0, width: 0, height: 0 })
+
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [nodes, setNodes] = useState<SimNode[]>([])
   const [links, setLinks] = useState<SimLink[]>([])
@@ -97,7 +107,18 @@ export default function Graph() {
 
     const measure = () => {
       const rect = element.getBoundingClientRect()
+      sizeRef.current = { width: rect.width, height: rect.height }
       setSize({ width: rect.width, height: rect.height })
+
+      const title = titleRef.current?.getBoundingClientRect()
+      if (title) {
+        titleBoxRef.current = {
+          x: title.left - rect.left,
+          y: title.top - rect.top,
+          width: title.width,
+          height: title.height,
+        }
+      }
     }
 
     measure()
@@ -111,8 +132,11 @@ export default function Graph() {
     }
   }, [])
 
+  const ready = size.width > 0 && size.height > 0
+
+  // Built once. Rebuilding it on every resize was what made the layout jump.
   useEffect(() => {
-    if (!size.width || !size.height) return
+    if (!ready) return
 
     const simNodes: SimNode[] = NODES.map((node) => ({ ...node }))
     const simLinks: SimLink[] = LINKS.map((link) => ({ ...link }))
@@ -150,7 +174,7 @@ export default function Graph() {
       // Cool down sooner, so the layout stops fidgeting once it is settled.
       .alphaDecay(0.035)
       .alphaMin(0.002)
-      .force('centre', forceCenter(size.width / 2, size.height / 2).strength(0.05))
+      .force('centre', forceCenter(sizeRef.current.width / 2, sizeRef.current.height / 2).strength(0.05))
       .force(
         'collide',
         forceCollide<SimNode>()
@@ -169,18 +193,41 @@ export default function Graph() {
           if (x < BOUNDS.left) {
             node.x = BOUNDS.left
             node.vx = Math.abs(node.vx ?? 0) * RESTITUTION
-          } else if (x > size.width - BOUNDS.right) {
-            node.x = size.width - BOUNDS.right
+          } else if (x > sizeRef.current.width - BOUNDS.right) {
+            node.x = sizeRef.current.width - BOUNDS.right
             node.vx = -Math.abs(node.vx ?? 0) * RESTITUTION
           }
 
           if (y < BOUNDS.top) {
             node.y = BOUNDS.top
             node.vy = Math.abs(node.vy ?? 0) * RESTITUTION
-          } else if (y > size.height - BOUNDS.bottom) {
-            node.y = size.height - BOUNDS.bottom
+          } else if (y > sizeRef.current.height - BOUNDS.bottom) {
+            node.y = sizeRef.current.height - BOUNDS.bottom
             node.vy = -Math.abs(node.vy ?? 0) * RESTITUTION
           }
+        }
+      })
+      // The title block holds the top left corner while it is visible.
+      .force('title', () => {
+        if (selectedRef.current) return
+        const box = titleBoxRef.current
+        if (!box.width || !box.height) return
+
+        const left = box.x - TITLE_MARGIN
+        const right = box.x + box.width + TITLE_MARGIN
+        const top = box.y - TITLE_MARGIN
+        const bottom = box.y + box.height + TITLE_MARGIN
+
+        for (const node of simNodes) {
+          const x = node.x ?? 0
+          const y = node.y ?? 0
+          if (x < left || x > right || y < top || y > bottom) continue
+
+          // Push out sideways or downwards; upwards would pin it to the wall.
+          const toRight = right - x
+          const toBottom = bottom - y
+          if (toRight < toBottom) node.vx = (node.vx ?? 0) + toRight * PANEL_PUSH
+          else node.vy = (node.vy ?? 0) + toBottom * PANEL_PUSH
         }
       })
       // The open window is a rectangle in the middle of the viewport. Push any
@@ -189,12 +236,13 @@ export default function Graph() {
       .force('panel', () => {
         if (!selectedRef.current) return
 
-        const panelWidth = size.width * PANEL_WIDTH_RATIO
-        const panelHeight = size.height * PANEL_HEIGHT_RATIO
-        const left = (size.width - panelWidth) / 2 - PANEL_MARGIN
-        const right = (size.width + panelWidth) / 2 + PANEL_MARGIN
-        const top = (size.height - panelHeight) / 2 - PANEL_MARGIN
-        const bottom = (size.height + panelHeight) / 2 + PANEL_MARGIN
+        const { width, height } = sizeRef.current
+        const panelWidth = width * PANEL_WIDTH_RATIO
+        const panelHeight = height * PANEL_HEIGHT_RATIO
+        const left = (width - panelWidth) / 2 - PANEL_MARGIN
+        const right = (width + panelWidth) / 2 + PANEL_MARGIN
+        const top = (height - panelHeight) / 2 - PANEL_MARGIN
+        const bottom = (height + panelHeight) / 2 + PANEL_MARGIN
 
         for (const node of simNodes) {
           const x = node.x ?? 0
@@ -224,7 +272,22 @@ export default function Graph() {
       simulation.stop()
       simulationRef.current = null
     }
-  }, [size.width, size.height])
+  }, [ready])
+
+  // Freeze while the viewport is being resized, then resume once it settles.
+  // Running the layout through a resize drag is what produced the flicker.
+  useEffect(() => {
+    const simulation = simulationRef.current
+    if (!simulation || !ready) return
+
+    simulation.stop()
+
+    const centre = simulation.force('centre') as ReturnType<typeof forceCenter> | null
+    centre?.x(size.width / 2)?.y(size.height / 2)
+
+    const timer = setTimeout(() => simulation.alpha(0.3).restart(), RESIZE_SETTLE_MS)
+    return () => clearTimeout(timer)
+  }, [size.width, size.height, ready])
 
   // Opening the window claims the middle of the screen, so re-heat and let the
   // graph re-settle around it.
@@ -302,17 +365,25 @@ export default function Graph() {
     <div ref={containerRef} className="relative h-dvh w-full overflow-hidden bg-black">
       {/* Site title, top left. Fades out while a window is open. */}
       <header
-        className={`pointer-events-none absolute top-8 left-10 z-10 font-pixel transition-opacity duration-300 ${
+        ref={titleRef}
+        className={`pointer-events-none absolute z-10 font-pixel transition-opacity duration-300 ${
           selected ? 'opacity-0' : 'opacity-100'
         }`}
+        style={{ top: '3%', left: '2.5%' }}
       >
         <h1
-          className="text-2xl tracking-[0.14em] text-[#fff6dc]"
-          style={{ textShadow: '0 0 12px rgba(255, 219, 130, 0.55)' }}
+          className="tracking-[0.14em] text-[#fff6dc]"
+          style={{
+            fontSize: 'clamp(18px, 2.1vw, 34px)',
+            textShadow: '0 0 12px rgba(255, 219, 130, 0.55)',
+          }}
         >
           Henri Lamarre
         </h1>
-        <p className="mt-2 font-mono text-sm tracking-wide text-[#c9b98a]">
+        <p
+          className="mt-2 font-mono tracking-wide text-[#c9b98a]"
+          style={{ fontSize: 'clamp(11px, 0.95vw, 17px)' }}
+        >
           Ph.D. in Astrophysics, Game Developper
         </p>
       </header>
@@ -438,15 +509,26 @@ export default function Graph() {
             className="pointer-events-none absolute inset-[6px] border border-white/12"
           />
 
-          <header className="relative flex shrink-0 items-start justify-between gap-4 px-8 py-5 select-none">
-            <h2 className="font-pixel text-2xl tracking-[0.12em] uppercase">
+          <header
+            className="relative flex shrink-0 items-center justify-between gap-4 select-none"
+            style={{ padding: 'clamp(14px, 1.6vw, 28px) clamp(18px, 2.2vw, 40px)' }}
+          >
+            <h2
+              className="font-pixel tracking-[0.12em] uppercase"
+              style={{ fontSize: 'clamp(18px, 1.9vw, 32px)' }}
+            >
               {selectedNode.name}
             </h2>
-            {/* Generous hit area, so the close target is easy to hit. */}
+            {/* Square target that scales with the window, so it stays in
+                proportion at any viewport size. */}
             <button
               type="button"
               onClick={() => setSelected(null)}
-              className="-mt-1 -mr-2 grid h-12 w-12 shrink-0 place-items-center border border-white/20 text-2xl leading-none text-slate-300 transition hover:border-white/60 hover:bg-white/10 hover:text-white"
+              className="grid aspect-square shrink-0 place-items-center border border-white/25 leading-none text-slate-300 transition hover:border-white/70 hover:bg-white/10 hover:text-white"
+              style={{
+                width: 'clamp(38px, 3.4vw, 60px)',
+                fontSize: 'clamp(20px, 1.8vw, 30px)',
+              }}
               aria-label="Fermer"
             >
               ×
