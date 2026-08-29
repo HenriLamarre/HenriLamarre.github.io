@@ -397,6 +397,26 @@ export default function Graph() {
 
   const selectedNode = nodes.find((node) => node.id === selected) ?? null
 
+  /** Every application, in data order — what prev/next cycles through. */
+  const applications = useMemo(() => NODES.filter((node) => node.kind === 'application'), [])
+
+  /** For an application, the categories it belongs to — its breadcrumb. */
+  const parentCategories = useMemo(() => {
+    const node = NODES.find((candidate) => candidate.id === selected)
+    if (!node || node.kind !== 'application') return []
+    return NODES.filter(
+      (candidate) => candidate.kind === 'category' && neighbours.has(candidate.id),
+    )
+  }, [selected, neighbours])
+
+  /** Step through the applications, wrapping at either end. */
+  const cycle = (step: number) => {
+    const index = applications.findIndex((node) => node.id === selected)
+    if (index < 0) return
+    const next = applications[(index + step + applications.length) % applications.length]
+    setSelected(next.id)
+  }
+
   /** For a category, the applications hanging off it — listed in its window. */
   const relatedApplications = useMemo(() => {
     const node = NODES.find((candidate) => candidate.id === selected)
@@ -555,12 +575,32 @@ export default function Graph() {
             className="relative flex shrink-0 items-center justify-between gap-4 select-none"
             style={{ padding: 'clamp(14px, 1.6vw, 28px) clamp(18px, 2.2vw, 40px)' }}
           >
-            <h2
-              className="font-pixel tracking-[0.12em] uppercase"
-              style={{ fontSize: 'clamp(18px, 1.9vw, 32px)' }}
-            >
-              {selectedNode.name}
-            </h2>
+            <div className="min-w-0">
+              {/* Categories this entry belongs to, as clickable tags. */}
+              {parentCategories.length > 0 && (
+                <nav className="mb-1 flex flex-wrap items-center gap-2 font-mono text-xs">
+                  {parentCategories.map((category, i) => (
+                    <span key={category.id} className="flex items-center gap-2">
+                      {i > 0 && <span className="text-[#7d6f45]">/</span>}
+                      <button
+                        type="button"
+                        onClick={() => setSelected(category.id)}
+                        className="text-[#c9b98a] transition hover:text-[#fff6dc]"
+                      >
+                        {category.name}
+                      </button>
+                    </span>
+                  ))}
+                </nav>
+              )}
+
+              <h2
+                className="font-pixel tracking-[0.12em] uppercase"
+                style={{ fontSize: 'clamp(18px, 1.9vw, 32px)' }}
+              >
+                {selectedNode.name}
+              </h2>
+            </div>
             {/* Square target that scales with the window, so it stays in
                 proportion at any viewport size. */}
             <button
@@ -643,6 +683,29 @@ export default function Graph() {
               </section>
             )}
           </div>
+
+          {/* Step through entries without going back to the constellation. */}
+          {selectedNode.kind === 'application' && applications.length > 1 && (
+            <footer
+              className="relative flex shrink-0 items-center justify-between border-t border-white/10 font-mono text-sm select-none"
+              style={{ padding: 'clamp(10px, 1.1vw, 18px) clamp(18px, 2.2vw, 40px)' }}
+            >
+              <button
+                type="button"
+                onClick={() => cycle(-1)}
+                className="text-[#c9b98a] transition hover:text-[#fff6dc]"
+              >
+                ‹ Précédent
+              </button>
+              <button
+                type="button"
+                onClick={() => cycle(1)}
+                className="text-[#c9b98a] transition hover:text-[#fff6dc]"
+              >
+                Suivant ›
+              </button>
+            </footer>
+          )}
         </article>
       )}
     </div>
