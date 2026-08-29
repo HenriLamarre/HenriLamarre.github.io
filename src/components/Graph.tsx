@@ -21,16 +21,17 @@ const CLEARANCE = { category: 62, application: 40 } as const
  * labels sit above and to the right of their star.
  */
 const BOUNDS = { left: 28, right: 110, top: 34, bottom: 28 }
-/** Velocity kept when a star hits a wall: above 1 means it bounces off harder. */
-const RESTITUTION = 1.15
+/** Velocity kept when a star hits a wall. Below 1, so walls absorb energy. */
+const RESTITUTION = 0.35
 
 /** The open window, as a fraction of the viewport. */
 const PANEL_WIDTH_RATIO = 0.75
 const PANEL_HEIGHT_RATIO = 0.7
 /** Clearance kept between the window's edge and any star. */
 const PANEL_MARGIN = 48
-/** How hard stars are pushed out of the window's footprint. */
-const PANEL_PUSH = 0.12
+/** How hard stars are pushed out of the window's footprint. Gentle, so they
+ *  ease out instead of overshooting and bouncing back in. */
+const PANEL_PUSH = 0.045
 
 type SimNode = SimulationNodeDatum & GraphNode
 type SimLink = SimulationLinkDatum<SimNode>
@@ -108,18 +109,27 @@ export default function Graph() {
       )
       .force(
         'charge',
-        forceManyBody<SimNode>().strength((node) =>
-          node.kind === 'category' ? -1200 : -420,
-        ),
+        forceManyBody<SimNode>()
+          .strength((node) => (node.kind === 'category' ? -900 : -320))
+          // Cap the range so distant stars stop nudging each other, which is a
+          // common source of low-level jitter.
+          .distanceMax(520),
       )
-      // Less damping, so stars carry their momentum and rebound briskly.
-      .velocityDecay(0.26)
+      // Heavy damping: most of a star's velocity is bled off every tick, so it
+      // glides into place instead of oscillating around it.
+      .velocityDecay(0.72)
+      // Cool down sooner, so the layout stops fidgeting once it is settled.
+      .alphaDecay(0.035)
+      .alphaMin(0.002)
       .force('centre', forceCenter(size.width / 2, size.height / 2).strength(0.05))
       .force(
         'collide',
         forceCollide<SimNode>()
           .radius((node) => CLEARANCE[node.kind])
-          .strength(0.9),
+          // Softer separation: a hard collide fights the other forces and
+          // shows up as vibration between neighbours.
+          .strength(0.55)
+          .iterations(2),
       )
       // Walls: clamp to the viewport and reflect, so nothing drifts off-screen.
       .force('bounds', () => {
