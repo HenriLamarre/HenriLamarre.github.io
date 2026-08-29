@@ -57,7 +57,7 @@ function CornerMarks() {
           key={i}
           aria-hidden
           className="pointer-events-none absolute h-[10px] w-[10px] bg-white"
-          style={{ ...position, boxShadow: '0 0 8px rgba(180, 220, 255, 0.9)' }}
+          style={{ ...position, boxShadow: '0 0 8px rgba(255, 219, 130, 0.9)' }}
         />
       ))}
     </>
@@ -69,10 +69,16 @@ export default function Graph() {
   const simulationRef = useRef<Simulation<SimNode, SimLink> | null>(null)
   const selectedRef = useRef<string | null>(null)
 
+  /** In-flight drag: which star, and how far the pointer has travelled. */
+  const dragRef = useRef<{ id: string; moved: number; lastX: number; lastY: number } | null>(
+    null,
+  )
+
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [nodes, setNodes] = useState<SimNode[]>([])
   const [links, setLinks] = useState<SimLink[]>([])
   const [selected, setSelected] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
 
   /** Neighbours of the selected node, for highlighting. */
   const neighbours = useMemo(() => {
@@ -227,17 +233,87 @@ export default function Graph() {
     simulationRef.current?.alpha(0.7).restart()
   }, [selected])
 
+  // Escape closes the open window.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelected(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  // Dragging a star. A pointer that barely moves counts as a click instead, so
+  // the same gesture can both open a window and reposition a node.
+  useEffect(() => {
+    const onPointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current
+      const simulation = simulationRef.current
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!drag || !simulation || !rect) return
+
+      drag.moved += Math.hypot(event.clientX - drag.lastX, event.clientY - drag.lastY)
+      drag.lastX = event.clientX
+      drag.lastY = event.clientY
+
+      const node = simulation.nodes().find((candidate) => candidate.id === drag.id)
+      if (!node) return
+
+      // Pin the star to the pointer; the rest of the graph reacts around it.
+      node.fx = event.clientX - rect.left
+      node.fy = event.clientY - rect.top
+      simulation.alphaTarget(0.25).restart()
+    }
+
+    const onPointerUp = () => {
+      const drag = dragRef.current
+      const simulation = simulationRef.current
+      dragRef.current = null
+      setDragging(false)
+      if (!drag || !simulation) return
+
+      const node = simulation.nodes().find((candidate) => candidate.id === drag.id)
+      if (node) {
+        // Release the pin so the layout takes the star back.
+        node.fx = null
+        node.fy = null
+      }
+
+      simulation.alphaTarget(0)
+
+      // Treat a near-stationary press as a click.
+      if (drag.moved < 5) {
+        setSelected((current) => (current === drag.id ? null : drag.id))
+      } else {
+        simulation.alpha(0.3).restart()
+      }
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [])
+
   const selectedNode = nodes.find((node) => node.id === selected) ?? null
 
   return (
     <div ref={containerRef} className="relative h-dvh w-full overflow-hidden bg-black">
-      <svg width={size.width} height={size.height} className="absolute inset-0">
+      {/* A press that reaches the background — i.e. not a star, not the window
+          — closes whatever is open. */}
+      <svg
+        width={size.width}
+        height={size.height}
+        className="absolute inset-0"
+        onPointerDown={() => setSelected(null)}
+      >
         <defs>
           {/* Soft halo, so the stars glow rather than sit flat. */}
           <radialGradient id="halo">
             <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
-            <stop offset="45%" stopColor="#cfe0ff" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="#cfe0ff" stopOpacity="0" />
+            <stop offset="45%" stopColor="#ffe9a8" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="#ffe9a8" stopOpacity="0" />
           </radialGradient>
         </defs>
 
@@ -259,7 +335,7 @@ export default function Graph() {
                 y1={source.y}
                 x2={target.x}
                 y2={target.y}
-                stroke={touchesSelected ? '#dceaff' : '#8fa8d0'}
+                stroke={touchesSelected ? '#fff3cd' : '#a8975f'}
                 strokeWidth={touchesSelected ? 1.6 : 0.7}
                 strokeOpacity={dimmed ? 0.08 : touchesSelected ? 0.85 : 0.28}
                 className="transition-[stroke-opacity,stroke-width] duration-300"
@@ -279,8 +355,19 @@ export default function Graph() {
               <g
                 key={node.id}
                 transform={`translate(${node.x ?? 0}, ${node.y ?? 0})`}
-                onClick={() => setSelected((current) => (current === node.id ? null : node.id))}
-                className="cursor-pointer transition-opacity duration-300"
+                onPointerDown={(event) => {
+                  event.stopPropagation()
+                  dragRef.current = {
+                    id: node.id,
+                    moved: 0,
+                    lastX: event.clientX,
+                    lastY: event.clientY,
+                  }
+                  setDragging(true)
+                }}
+                className={`transition-opacity duration-300 ${
+                  dragging ? 'cursor-grabbing' : 'cursor-grab'
+                }`}
                 opacity={dimmed ? 0.25 : 1}
               >
                 {/* Generous invisible hit area — the stars themselves are tiny. */}
@@ -298,7 +385,7 @@ export default function Graph() {
                   x={r + 5}
                   y={-(r + 5)}
                   textAnchor="start"
-                  fill={node.kind === 'category' ? '#eaf1ff' : '#9fb3d4'}
+                  fill={node.kind === 'category' ? '#fff6dc' : '#c9b98a'}
                   className={`font-pixel select-none ${
                     node.kind === 'category' ? 'text-base' : 'text-xs'
                   }`}
@@ -314,16 +401,16 @@ export default function Graph() {
 
       {selectedNode && (
         <article
-          className="absolute flex flex-col bg-[#01060d]/85 text-slate-100 backdrop-blur-md"
+          className="hud-panel absolute flex flex-col bg-[#0a0702]/88 text-slate-100 backdrop-blur-md"
           style={{
             width: `${PANEL_WIDTH_RATIO * 100}%`,
             height: `${PANEL_HEIGHT_RATIO * 100}%`,
             left: '50%',
             top: '50%',
             transform: 'translate(-50%, -50%)',
-            border: '1px solid rgba(214, 238, 255, 0.85)',
+            border: '1px solid rgba(255, 246, 214, 0.85)',
             boxShadow:
-              '0 0 10px rgba(150, 205, 255, 0.45), 0 0 34px rgba(90, 165, 255, 0.25), inset 0 0 26px rgba(120, 190, 255, 0.07)',
+              '0 0 10px rgba(255, 219, 130, 0.45), 0 0 34px rgba(255, 190, 60, 0.22), inset 0 0 26px rgba(255, 214, 120, 0.07)',
           }}
         >
           <CornerMarks />
@@ -334,7 +421,7 @@ export default function Graph() {
             className="pointer-events-none absolute inset-[6px] border border-white/12"
           />
 
-          <header className="relative flex shrink-0 items-start justify-between gap-4 px-8 py-5">
+          <header className="relative flex shrink-0 items-start justify-between gap-4 px-8 py-5 select-none">
             <h2 className="font-pixel text-2xl tracking-[0.12em] uppercase">
               {selectedNode.name}
             </h2>
@@ -352,7 +439,7 @@ export default function Graph() {
           <span
             aria-hidden
             className="mx-6 block h-px shrink-0 bg-white/60"
-            style={{ boxShadow: '0 0 6px rgba(170, 215, 255, 0.8)' }}
+            style={{ boxShadow: '0 0 6px rgba(255, 219, 130, 0.85)' }}
           />
 
           {/* Scrolls independently, so a project can carry as much as it needs. */}
