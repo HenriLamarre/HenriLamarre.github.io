@@ -41,6 +41,29 @@ function endpointId(endpoint: SimLink['source']): string {
   return typeof endpoint === 'object' ? (endpoint as SimNode).id : String(endpoint)
 }
 
+/** The small filled blocks that sit on each corner of a HUD frame. */
+function CornerMarks() {
+  const positions = [
+    { top: -5, left: -5 },
+    { top: -5, right: -5 },
+    { bottom: -5, left: -5 },
+    { bottom: -5, right: -5 },
+  ]
+
+  return (
+    <>
+      {positions.map((position, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className="pointer-events-none absolute h-[10px] w-[10px] bg-white"
+          style={{ ...position, boxShadow: '0 0 8px rgba(180, 220, 255, 0.9)' }}
+        />
+      ))}
+    </>
+  )
+}
+
 export default function Graph() {
   const containerRef = useRef<HTMLDivElement>(null)
   const simulationRef = useRef<Simulation<SimNode, SimLink> | null>(null)
@@ -276,7 +299,9 @@ export default function Graph() {
                   y={-(r + 5)}
                   textAnchor="start"
                   fill={node.kind === 'category' ? '#eaf1ff' : '#9fb3d4'}
-                  className={`select-none ${node.kind === 'category' ? 'text-sm' : 'text-xs'}`}
+                  className={`font-pixel select-none ${
+                    node.kind === 'category' ? 'text-base' : 'text-xs'
+                  }`}
                   style={{ letterSpacing: node.kind === 'category' ? '0.08em' : '0.04em' }}
                 >
                   {node.name}
@@ -289,29 +314,49 @@ export default function Graph() {
 
       {selectedNode && (
         <article
-          className="absolute flex flex-col border border-white/15 bg-black/70 text-slate-100 shadow-2xl backdrop-blur-md"
+          className="absolute flex flex-col bg-[#01060d]/85 text-slate-100 backdrop-blur-md"
           style={{
             width: `${PANEL_WIDTH_RATIO * 100}%`,
             height: `${PANEL_HEIGHT_RATIO * 100}%`,
             left: '50%',
             top: '50%',
             transform: 'translate(-50%, -50%)',
+            border: '1px solid rgba(214, 238, 255, 0.85)',
+            boxShadow:
+              '0 0 10px rgba(150, 205, 255, 0.45), 0 0 34px rgba(90, 165, 255, 0.25), inset 0 0 26px rgba(120, 190, 255, 0.07)',
           }}
         >
-          <header className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 px-8 py-5">
-            <h2 className="text-2xl tracking-wide">{selectedNode.name}</h2>
+          <CornerMarks />
+
+          {/* Faint inner frame, as in the reference. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-[6px] border border-white/12"
+          />
+
+          <header className="relative flex shrink-0 items-start justify-between gap-4 px-8 py-5">
+            <h2 className="font-pixel text-2xl tracking-[0.12em] uppercase">
+              {selectedNode.name}
+            </h2>
             <button
               type="button"
               onClick={() => setSelected(null)}
-              className="text-2xl leading-none text-slate-400 transition hover:text-white"
+              className="font-pixel text-xl leading-none text-slate-300 transition hover:text-white"
               aria-label="Fermer"
             >
               ×
             </button>
           </header>
 
+          {/* Glowing rule under the header. */}
+          <span
+            aria-hidden
+            className="mx-6 block h-px shrink-0 bg-white/60"
+            style={{ boxShadow: '0 0 6px rgba(170, 215, 255, 0.8)' }}
+          />
+
           {/* Scrolls independently, so a project can carry as much as it needs. */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+          <div className="hud-scroll relative min-h-0 flex-1 overflow-y-auto px-8 py-6">
             {selectedNode.description && (
               <p className="text-base leading-relaxed text-slate-300">
                 {selectedNode.description}
