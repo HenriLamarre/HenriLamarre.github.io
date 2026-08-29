@@ -1,37 +1,6 @@
 @import "tailwindcss";
 
-/* Extracted from mainhub.riv so HTML text matches the Rive scene exactly.
-   Hermeneus One by Pablo Impallari & Rodrigo Fuenzalida, SIL OFL 1.1. */
-@font-face {
-  font-family: "Hermeneus One";
-  src: url("/fonts/HermeneusOne.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@theme {
-  --color-void: #000000;
-  --color-star: #f4f4f6;
-  /* Matches the font embedded in mainhub.riv. */
-  --font-display: "Hermeneus One", Georgia, serif;
-}
-
-html {
-  color-scheme: dark;
-}
-
 body {
   margin: 0;
   min-height: 100dvh;
-  background: var(--color-void);
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
