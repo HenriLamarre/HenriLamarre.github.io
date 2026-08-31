@@ -1,14 +1,18 @@
+import type { Text } from '../i18n/types'
+import type { Block } from './blocks'
+
 export type NodeKind = 'category' | 'application'
 
 export type GraphNode = {
+  /** Never translated — this is what links refer to. */
   id: string
-  name: string
   kind: NodeKind
+  name: Text
   /** Lead paragraph shown in the window when the node is opened. */
-  description?: string
-  /** Further paragraphs. The window scrolls, so add as many as needed. */
-  body?: string[]
-  link?: { href: string; label: string }
+  description?: Text
+  /** The body of the window: text, images, links, video, 3D. */
+  body?: Block[]
+  link?: { href: string; label: Text }
 }
 
 export type GraphLink = {
@@ -18,39 +22,155 @@ export type GraphLink = {
 
 export const NODES: GraphNode[] = [
   // Categories — the bright, well-connected stars.
-  { id: 'recherche', name: 'Recherche', kind: 'category', description: 'Physique solaire et magnétohydrodynamique. Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.Physique solaire et magnétohydrodynamique.' },
-  { id: 'modelisation', name: 'Modélisation', kind: 'category', description: 'Blender, geometry nodes, rendu procédural.' },
-  { id: 'jeux', name: 'Jeux', kind: 'category', description: 'Prototypes, outils et projets de jeux.' },
-  { id: 'enseignement', name: 'Enseignement', kind: 'category', description: 'Cours, ateliers et vulgarisation.' },
+  {
+    id: 'study',
+    kind: 'category',
+    name: { fr: 'Études', en: 'Studies' },
+    description: {
+      fr: 'Math et Physique.',
+      en: 'Math and Physics.',
+    },
+  },
+  {
+    id: 'programmation',
+    kind: 'category',
+    name: { fr: 'Programmation', en: 'Coding' },
+    description: {
+      fr: 'Python, C#, Fortran, Bash, etc.',
+      en: 'Python, C#, Fortran, Bash, etc.',
+    },
+  },
+  {
+    id: 'pedagogie',
+    kind: 'category',
+    name: { fr: 'Pédagogie', en: 'Pedagogy' },
+    description: {
+      fr: 'Enseignement, vulgarisation et conférences.',
+      en: 'Teaching, outreach and conferences.',
+    },
+  },
+  {
+    id: 'modelisation',
+    kind: 'category',
+    name: { fr: 'Modelisation', en: 'Modelisation' },
+    description: {
+      fr: 'Modélisation et simulation numérique.',
+      en: 'Modeling and numerical simulation.',
+    },
+  },
+  {
+    id: 'musique',
+    kind: 'category',
+    name: { fr: 'Musique', en: 'Music' },
+    description: {
+      fr: 'Création et production musicale.',
+      en: 'Music creation and production.',
+    },
+  },
 
   // Applications — smaller stars orbiting their category.
-  { id: 'mhd', name: 'MHD', kind: 'application', description: 'Simulations magnétohydrodynamiques 3D.' },
-  { id: 'avalanches', name: 'Avalanches', kind: 'application', description: 'Criticalité auto-organisée et éruptions solaires.' },
-  { id: 'cosmic-dawn', name: 'Cosmic dawn', kind: 'application', description: 'Réionisation et signal 21 cm.' },
-  { id: 'derapage', name: 'Dérapage', kind: 'application', description: "Compétition d'animation." },
-  { id: 'geometry-nodes', name: 'Geometry nodes', kind: 'application', description: 'Expérimentation procédurale.' },
-  { id: 'klaxon', name: 'Klaxon', kind: 'application', description: 'Projet de jeu.' },
-  { id: 'ore', name: 'Ore', kind: 'application', description: 'Prototype de tuiles et de ressources.' },
-  { id: 'python', name: 'Python', kind: 'application', description: 'Analyse et visualisation de données.' },
-  { id: 'ateliers', name: 'Ateliers', kind: 'application', description: 'Activités de vulgarisation.' },
+  {
+    id: 'diplomes',
+    kind: 'application',
+    name: { fr: 'Diplômes', en: 'Degrees' },
+    body: [
+      {type: 'text', variant: 'title', text: {en: 'Double DEC in Music and Natural Sciences', fr: 'Double DEC en Musique et Sciences Naturelles'}},
+      {type: 'link', href: 'https://www.cegepsl.qc.ca/', label: {en: 'CEGEP Saint-Laurent', fr: 'CEGEP Saint-Laurent'}},
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'BAC Honours Math and Physics', fr: 'BAC Honours Math et Physique'}},
+      {type: 'link', href: 'https://www.mcgill.ca/', label: {en: 'McGill University', fr: 'Université McGill'}},
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Ph.D. in Astrophysics', fr: 'Ph.D. en Astrophysique'}},
+      {type: 'text', variant: 'subtitle', text: {en: 'Thesis on predicting solar flares', fr: 'Thèse sur la prédiction des éruptions solaires'}},
+      {type: 'link', href: 'https://www.umontreal.ca/', label: {en: 'University of Montreal', fr: 'Université de Montréal'}},
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Microprogram in indie video games', fr: 'Micropgrogramme en jeux vidéo indépendants'}},
+      {type: 'link', href: 'https://www.uqat.ca/etudes/creation-et-nouveaux-medias/microprogramme-1er-cycle-en-jeu-video-independant/', label: {en: 'University of Quebec in Abitibi-Témiscamingue', fr: 'Université du Québec en Abitibi-Témiscamingue'}},
+
+    ]
+  },
+  {
+    id: 'conferences',
+    kind: 'application',
+    name: { fr: 'Conférences', en: 'Conferences' },
+  },
+  {
+    id: 'recherche',
+    kind: 'application',
+    name: { fr: 'Recherche', en: 'Research' },
+  },
+  {
+    id: 'enseignement',
+    kind: 'application',
+    name: { fr: 'Enseignement', en: 'Teaching' },
+  },
+  {
+    id: 'vulgarisation',
+    kind: 'application',
+    name: { fr: 'Vulgarisation', en: 'Outreach' },
+  },
+  {
+    id: 'derapage',
+    kind: 'application',
+    name: { fr: 'Dérapage', en: 'Dérapage' },
+    body: [
+      {type: 'text', variant: 'title', text: {en: 'Dérapage Competition', fr: 'Concours Dérapage'}},
+      {type: 'text', variant: 'subtitle', text: {en: 'DÉRAPAGE is a unique event of audiovisual exploration that annually invites people from all disciplines to create a non narrative sonorized audiovisual short piece of less than three minutes.', fr: 'L’événement DÉRAPAGE est consacré à l’expérimentation de techniques d’animation et de tournage vidéo non traditionnels, à l’exploration de systèmes de scénarisation et de structures de non narration et d’abstraction audiovisuelles : rythme et mouvement, animation abstraite, «video synthesis», design génératif.'}},
+      {type: 'link', href: 'https://derapage.ca/#a-propos', label: {en: 'Learn more about DÉRAPAGE', fr: 'En savoir plus sur DÉRAPAGE'}},
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Dérapage 2024', fr: 'Dérapage 2024'}},
+      {type: 'text', variant: 'subtitle', text: {en: 'SOUPE AUX CHOUX', fr: 'SOUPE AUX CHOUX'}},
+      {type: 'video', youtube: 'cvYGijhQTRI', caption: { en: 'Video of the 2024 DÉRAPAGE competition', fr: 'Vidéo du concours DÉRAPAGE 2024' } },
+      {type: 'text', variant: 'subtitle', text: {en: 'Model generated for the video', fr: 'Modèle généré pour la vidéo'}},
+      {type: 'text', text: {en: 'Procedural model generated on blender with geometry nodes', fr: 'Modèle 3D procedural généré sur blender avec des geometry nodes' }},
+      {type: 'model', src: '/models/Model1.glb' }
+
+    ]
+  },
+  {
+    id: 'procedural',
+    kind: 'application',
+    name: { fr: 'Expérimentations Procédurales', en: 'Procedural experiments' },
+  },
+  {
+    id: 'gamejams',
+    kind: 'application',
+    name: { fr: 'Compétitions de Jeux', en: 'Game Jams' },
+  },
+  {
+    id: 'h0l0gram',
+    kind: 'application',
+    name: { fr: 'H0l0gram', en: 'H0l0gram' },
+  },
+  {
+    id: 'klaxon',
+    kind: 'application',
+    name: { fr: 'Klaxon', en: 'Klaxon' },
+  },
 ]
 
 /** Applications attach to their category. */
 const MEMBERSHIP: GraphLink[] = [
-  { source: 'recherche', target: 'mhd' },
-  { source: 'recherche', target: 'avalanches' },
-  { source: 'recherche', target: 'cosmic-dawn' },
+  { source: 'musique', target: 'h0l0gram' },
+  { source: 'musique', target: 'gamejams' },
+  { source: 'musique', target: 'klaxon' },
+  { source: 'modelisation', target: 'procedural' },
+  { source: 'modelisation', target: 'klaxon' },
   { source: 'modelisation', target: 'derapage' },
-  { source: 'modelisation', target: 'geometry-nodes' },
-  { source: 'jeux', target: 'klaxon' },
-  { source: 'jeux', target: 'ore' },
-  { source: 'enseignement', target: 'python' },
-  { source: 'enseignement', target: 'ateliers' },
+  { source: 'modelisation', target: 'gamejams' },
+  { source: 'pedagogie', target: 'conferences' },
+  { source: 'pedagogie', target: 'enseignement' },
+  { source: 'pedagogie', target: 'vulgarisation' },
+  { source: 'study', target: 'diplomes' },
+  { source: 'study', target: 'recherche' },
+  { source: 'study', target: 'enseignement' },
+  { source: 'study', target: 'conferences' },
+  { source: 'programmation', target: 'recherche' },
+  { source: 'programmation', target: 'derapage' },
+  { source: 'programmation', target: 'procedural' },
+  { source: 'programmation', target: 'gamejams' },
+  { source: 'programmation', target: 'klaxon' },
 
-  // Cross-links: an application can belong to more than one category.
-  { source: 'modelisation', target: 'mhd' },
-  { source: 'jeux', target: 'geometry-nodes' },
-  { source: 'recherche', target: 'python' },
 ]
 
 const CATEGORY_IDS = NODES.filter((node) => node.kind === 'category').map((node) => node.id)

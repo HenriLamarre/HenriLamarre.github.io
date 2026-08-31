@@ -10,6 +10,9 @@ import {
   type SimulationNodeDatum,
 } from 'd3-force'
 import { LINKS, NODES, type GraphNode, type NodeKind } from '../graph/data'
+import { useLocale } from '../i18n/locale'
+import { UI } from '../i18n/ui'
+import BlockList from './blocks/BlockList'
 
 /** Star size by kind: categories are the bright ones. */
 const RADIUS = { category: 7, application: 3.5 } as const
@@ -129,6 +132,7 @@ function CornerMarks() {
 }
 
 export default function Graph() {
+  const { locale, setLocale, t } = useLocale()
   const containerRef = useRef<HTMLDivElement>(null)
   const simulationRef = useRef<Simulation<SimNode, SimLink> | null>(null)
   const selectedRef = useRef<string | null>(null)
@@ -143,9 +147,11 @@ export default function Graph() {
 
   /** Latest size, read by the forces so they never close over a stale value. */
   const sizeRef = useRef({ width: 0, height: 0 })
-  /** Title box in container coordinates, so stars can be kept out of it. */
+  /** Chrome boxes in container coordinates, so stars can be kept out of them. */
   const titleRef = useRef<HTMLElement>(null)
   const titleBoxRef = useRef({ x: 0, y: 0, width: 0, height: 0 })
+  const localeRef = useRef<HTMLDivElement>(null)
+  const localeBoxRef = useRef({ x: 0, y: 0, width: 0, height: 0 })
 
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [nodes, setNodes] = useState<SimNode[]>([])
@@ -173,15 +179,18 @@ export default function Graph() {
       sizeRef.current = { width: rect.width, height: rect.height }
       setSize({ width: rect.width, height: rect.height })
 
+      const toLocal = (box: DOMRect) => ({
+        x: box.left - rect.left,
+        y: box.top - rect.top,
+        width: box.width,
+        height: box.height,
+      })
+
       const title = titleRef.current?.getBoundingClientRect()
-      if (title) {
-        titleBoxRef.current = {
-          x: title.left - rect.left,
-          y: title.top - rect.top,
-          width: title.width,
-          height: title.height,
-        }
-      }
+      if (title) titleBoxRef.current = toLocal(title)
+
+      const language = localeRef.current?.getBoundingClientRect()
+      if (language) localeBoxRef.current = toLocal(language)
     }
 
     measure()
@@ -292,27 +301,41 @@ export default function Graph() {
         pointer.dx *= POINTER_DECAY
         pointer.dy *= POINTER_DECAY
       })
-      // The title block holds the top left corner while it is visible.
-      .force('title', () => {
-        if (selectedRef.current) return
-        const box = titleBoxRef.current
-        if (!box.width || !box.height) return
+      // The page chrome holds its corners: the title top left, the language
+      // switch top right. Both push stars out sideways or downwards, since
+      // upwards would only pin them against the wall.
+      .force('chrome', () => {
+        const boxes = [
+          // The title fades out while a window is open; the switch never does.
+          selectedRef.current ? null : { box: titleBoxRef.current, awayFrom: 'left' },
+          { box: localeBoxRef.current, awayFrom: 'right' },
+        ] as const
 
-        const left = box.x - TITLE_MARGIN
-        const right = box.x + box.width + TITLE_MARGIN
-        const top = box.y - TITLE_MARGIN
-        const bottom = box.y + box.height + TITLE_MARGIN
+        for (const entry of boxes) {
+          if (!entry) continue
+          const { box, awayFrom } = entry
+          if (!box.width || !box.height) continue
 
-        for (const node of simNodes) {
-          const x = node.x ?? 0
-          const y = node.y ?? 0
-          if (x < left || x > right || y < top || y > bottom) continue
+          const left = box.x - TITLE_MARGIN
+          const right = box.x + box.width + TITLE_MARGIN
+          const top = box.y - TITLE_MARGIN
+          const bottom = box.y + box.height + TITLE_MARGIN
 
-          // Push out sideways or downwards; upwards would pin it to the wall.
-          const toRight = right - x
-          const toBottom = bottom - y
-          if (toRight < toBottom) node.vx = (node.vx ?? 0) + toRight * PANEL_PUSH
-          else node.vy = (node.vy ?? 0) + toBottom * PANEL_PUSH
+          for (const node of simNodes) {
+            const x = node.x ?? 0
+            const y = node.y ?? 0
+            if (x < left || x > right || y < top || y > bottom) continue
+
+            const sideways = awayFrom === 'left' ? right - x : x - left
+            const toBottom = bottom - y
+
+            if (sideways < toBottom) {
+              node.vx =
+                (node.vx ?? 0) + (awayFrom === 'left' ? sideways : -sideways) * PANEL_PUSH
+            } else {
+              node.vy = (node.vy ?? 0) + toBottom * PANEL_PUSH
+            }
+          }
         }
       })
       // The open window is a rectangle carried by its star. Push any other star
@@ -544,9 +567,40 @@ export default function Graph() {
           className="mt-2 font-mono tracking-wide text-[#c9b98a]"
           style={{ fontSize: 'clamp(11px, 0.95vw, 17px)' }}
         >
-          Ph.D. in Astrophysics, Game Developer
+          {t(UI.subtitle)}
         </p>
       </header>
+
+      {/* Language switch, top right, mirroring the title. Stays visible while
+          a window is open, since that is where most of the text is. */}
+      <div
+        ref={localeRef}
+        className="font-pixel absolute z-20 flex items-center gap-2 text-sm tracking-[0.1em]"
+        style={{ top: '3%', right: '2.5%' }}
+      >
+        {(['fr', 'en'] as const).map((option, i) => (
+          <span key={option} className="flex items-center gap-2">
+            {i > 0 && <span className="text-[#7d6f45]">/</span>}
+            <button
+              type="button"
+              onClick={() => setLocale(option)}
+              aria-current={locale === option}
+              className={
+                locale === option
+                  ? 'text-[#fff6dc]'
+                  : 'text-[#7d6f45] transition hover:text-[#c9b98a]'
+              }
+              style={
+                locale === option
+                  ? { textShadow: '0 0 10px rgba(255, 219, 130, 0.5)' }
+                  : undefined
+              }
+            >
+              {option.toUpperCase()}
+            </button>
+          </span>
+        ))}
+      </div>
 
       {/* A press that reaches the background — i.e. not a star, not the window
           — closes whatever is open. */}
@@ -639,7 +693,7 @@ export default function Graph() {
                   }`}
                   style={{ letterSpacing: node.kind === 'category' ? '0.08em' : '0.04em' }}
                 >
-                  {node.name}
+                  {t(node.name)}
                 </text>
               </g>
             )
@@ -682,7 +736,7 @@ export default function Graph() {
                         onClick={() => setSelected(category.id)}
                         className="text-[#c9b98a] transition hover:text-[#fff6dc]"
                       >
-                        {category.name}
+                        {t(category.name)}
                       </button>
                     </span>
                   ))}
@@ -693,7 +747,7 @@ export default function Graph() {
                 className="font-pixel tracking-[0.12em] uppercase"
                 style={{ fontSize: 'clamp(18px, 1.9vw, 32px)' }}
               >
-                {selectedNode.name}
+                {t(selectedNode.name)}
               </h2>
             </div>
             {/* Square target that scales with the window, so it stays in
@@ -703,7 +757,7 @@ export default function Graph() {
               onClick={() => setSelected(null)}
               className="relative aspect-square shrink-0 border border-white/25 text-slate-300 transition hover:border-white/70 hover:bg-white/10 hover:text-white"
               style={{ width: 'clamp(38px, 3.4vw, 60px)' }}
-              aria-label="Fermer"
+              aria-label={t(UI.close)}
             >
               {/* Two diagonals spanning the box, corner to corner. */}
               <svg
@@ -748,15 +802,15 @@ export default function Graph() {
               <>
                 {selectedNode.description && (
                   <p className="text-sm leading-relaxed text-slate-300">
-                    {selectedNode.description}
+                    {t(selectedNode.description)}
                   </p>
                 )}
 
-                {selectedNode.body?.map((paragraph, i) => (
-                  <p key={i} className="mt-4 text-sm leading-relaxed text-slate-400">
-                    {paragraph}
-                  </p>
-                ))}
+                {selectedNode.body && selectedNode.body.length > 0 && (
+                  <div className="mt-5">
+                    <BlockList blocks={selectedNode.body} />
+                  </div>
+                )}
               </>
             )}
 
@@ -767,7 +821,7 @@ export default function Graph() {
                 rel="noopener noreferrer"
                 className="mt-6 inline-block border-b border-white/40 text-sm hover:border-white"
               >
-                {selectedNode.link.label} ↗
+                {t(selectedNode.link.label)} ↗
               </a>
             )}
 
@@ -784,10 +838,10 @@ export default function Graph() {
                         <span className="text-[#c9b98a] transition group-hover:text-[#fff6dc]">
                           →
                         </span>
-                        <span className="text-[#fff6dc]">{application.name}</span>
+                        <span className="text-[#fff6dc]">{t(application.name)}</span>
                         {application.description && (
                           <span className="ml-auto truncate pl-6 text-xs text-[#a8975f]">
-                            {application.description}
+                            {t(application.description)}
                           </span>
                         )}
                       </button>
@@ -809,14 +863,14 @@ export default function Graph() {
                 onClick={() => cycle(-1)}
                 className="text-[#c9b98a] transition hover:text-[#fff6dc]"
               >
-                ‹ Précédent
+                ‹ {t(UI.previous)}
               </button>
               <button
                 type="button"
                 onClick={() => cycle(1)}
                 className="text-[#c9b98a] transition hover:text-[#fff6dc]"
               >
-                Suivant ›
+                {t(UI.next)} ›
               </button>
             </footer>
           )}
