@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import type { Block } from '../../graph/blocks'
 import { useLocale } from '../../i18n/locale'
 import { inlineMarkup } from './inline'
+import LazyFrame from './LazyFrame'
 
 // Three.js is only needed by model blocks, so it stays out of the main bundle.
 const ModelViewer = lazy(() => import('./ModelViewer'))
@@ -11,9 +12,19 @@ function Caption({ children }: { children: React.ReactNode }) {
 }
 
 /** A framed box, matching the HUD look of the window itself. */
-function Frame({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function Frame({
+  children,
+  className = '',
+  style,
+}: {
+  children: React.ReactNode
+  className?: string
+  style?: React.CSSProperties
+}) {
   return (
-    <div className={`border border-white/15 bg-black/30 ${className}`}>{children}</div>
+    <div className={`border border-white/15 bg-black/30 ${className}`} style={style}>
+      {children}
+    </div>
   )
 }
 
@@ -109,6 +120,53 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
                 {block.caption && <Caption>{t(block.caption)}</Caption>}
               </figure>
             )
+
+          case 'embed':
+            return (
+              // Same sizing logic as video: width leads on a phone, height on
+              // a desktop, so an embedded game is not squeezed into a strip.
+              <div key={i} className="md:flex md:flex-col md:items-center">
+                <Frame
+                  className="w-full md:h-[46vh] md:w-auto"
+                  style={{ aspectRatio: String(block.aspect ?? 16 / 9) }}
+                >
+                  <LazyFrame className="h-full w-full">
+                    <iframe
+                      src={block.src}
+                      title={block.title ? t(block.title) : 'embedded content'}
+                      allow="fullscreen; autoplay; gamepad; clipboard-write"
+                      allowFullScreen
+                      loading="lazy"
+                      className="h-full w-full"
+                    />
+                  </LazyFrame>
+                </Frame>
+              </div>
+            )
+
+          case 'itch': {
+            // itch's widget takes its palette from the query string, so it can
+            // be tuned to the page instead of arriving in its default grey.
+            const colours = new URLSearchParams({
+              linkback: 'true',
+              bg_color: '0a0803',
+              fg_color: 'f4f4f6',
+              link_color: 'ffd873',
+              border_color: '3a3225',
+            })
+
+            return (
+              // Fixed 552x167 by design; capped so it cannot overflow a phone.
+              <LazyFrame key={i} className="h-[167px] w-full max-w-[552px]">
+                <iframe
+                  src={`https://itch.io/embed/${block.id}?${colours}`}
+                  title={block.label ? t(block.label) : 'itch.io'}
+                  loading="lazy"
+                  className="h-full w-full border-0"
+                />
+              </LazyFrame>
+            )
+          }
 
           case 'rule':
             return (

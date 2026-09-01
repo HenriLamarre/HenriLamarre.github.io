@@ -139,11 +139,44 @@ export const NODES: GraphNode[] = [
     id: 'procedural',
     kind: 'application',
     name: { fr: 'Expérimentations Procédurales', en: 'Procedural experiments' },
+    body: [
+      {type: 'text', text: {en: 'Exploration of using mathematical functions to evolve 3D models in Blender', fr: 'Exploration de l\'utilisation de fonctions mathématiques pour faire évoluer des modèles 3D dans Blender'}},
+      
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Liquid Gold', fr: 'Or Liquide'}},
+      {type: 'text', text: {en: 'Procedural model of a standing wave generated on blender with geometry nodes', fr: 'Modèle 3D d\'une onde stationnaire procedural généré sur blender avec des geometry nodes' }},
+      {type: 'model', src: '/models/Model6.glb', zoom: 1.5},
+
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Vortex', fr: 'Vortex'}},
+      {type: 'text', text: {en: 'Procedural model of a a curl-driven normal excursion generated on blender with geometry nodes', fr: 'Modèle 3D d\'une excursion menée par le rotationnel de la normale, généré sur blender avec des geometry nodes' }},
+      {type: 'model', src: '/models/Model3.glb', zoom: 1.5},
+
+    ]
   },
   {
     id: 'gamejams',
     kind: 'application',
     name: { fr: 'Compétitions de Jeux', en: 'Game Jams' },
+    body: [
+      {type: 'text', text: {en: 'Game Jams are events where developers create games in a short amount of time', fr: 'Les Game Jams sont des événements où les développeurs créent des jeux en un temps réduit'}},
+      
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Dap Mr. P', fr: 'Dap Mr. P'}},
+      {type: 'text', text: {en: 'Game Jam made for the BigMode Game Jam 2026', fr: 'Jeux de la BigMode Game Jam 2026' }},
+      { type: 'itch', id: '4239580', label: { en: 'Dap Mr. P', fr: 'Dap Mr. P' } },
+
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Gargantua', fr: 'Gargantua'}},
+      {type: 'text', text: {en: 'Game Jam made for the Rive Game Challenge', fr: 'Jeux fait pour le Challenge de Jeux Rive' }},
+      { type: 'itch', id: '4308280', label: { en: 'Gargantua', fr: 'Gargantua' } },
+
+
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Diamond Drive', fr: 'Diamond Drive'}},
+      {type: 'text', text: {en: 'Game Jam made for the BigMode Game Jam 2025', fr: 'Jeux de la BigMode Game Jam 2025' }},
+      { type: 'itch', id: '3298422', label: { en: 'Diamond Drive', fr: 'Diamond Drive' } },
+    ]
   },
   {
     id: 'h0l0gram',

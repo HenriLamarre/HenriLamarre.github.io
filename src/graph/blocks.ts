@@ -24,6 +24,20 @@ export type Block =
    * glowing rim (default) or a wireframe reading of it.
    */
   | { type: 'model'; src: string; zoom?: number; render?: 'shaded' | 'hologram' }
+  /**
+   * Anything embeddable in an iframe — an itch.io HTML game, a CodePen, a
+   * player. For itch, use the playable upload URL
+   * (`https://itch.io/embed-upload/…`), not the `embed/…` purchase widget.
+   *
+   * `aspect` is width ÷ height, defaulting to 16/9.
+   */
+  | { type: 'embed'; src: string; title?: Text; aspect?: number }
+  /**
+   * The itch.io promo card — cover, title, price, link — rather than the
+   * playable build. `id` is the number in the embed code itch gives you:
+   * `https://itch.io/embed/4239580` → `'4239580'`.
+   */
+  | { type: 'itch'; id: string; label?: Text }
   /** A full-width rule, for separating sections. */
   | { type: 'rule' }
 
@@ -41,6 +55,10 @@ export function blockTexts(block: Block): Array<[string, Text | undefined]> {
       return [['label', block.label]]
     case 'video':
       return [['caption', block.caption]]
+    case 'embed':
+      return [['title', block.title]]
+    case 'itch':
+      return [['label', block.label]]
     case 'model':
     case 'rule':
       return []
