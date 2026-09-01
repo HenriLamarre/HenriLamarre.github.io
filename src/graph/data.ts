@@ -86,16 +86,20 @@ export const NODES: GraphNode[] = [
     name: { fr: 'Diplômes', en: 'Degrees' },
     body: [
       {type: 'text', variant: 'title', text: {en: 'Double DEC in Music and Natural Sciences', fr: 'Double DEC en Musique et Sciences Naturelles'}},
+      {type: 'text', variant: 'subtitle', text: {en: '2015-2018', fr: '2015-2018'}},
       {type: 'link', href: 'https://www.cegepsl.qc.ca/', label: {en: 'CEGEP Saint-Laurent', fr: 'CEGEP Saint-Laurent'}},
       {type: 'rule'},
       {type: 'text', variant: 'title', text: {en: 'BAC Honours Math and Physics', fr: 'BAC Honours Math et Physique'}},
+      {type: 'text', variant: 'subtitle', text: {en: '2018-2021', fr: '2018-2021'}},
       {type: 'link', href: 'https://www.mcgill.ca/', label: {en: 'McGill University', fr: 'Université McGill'}},
       {type: 'rule'},
       {type: 'text', variant: 'title', text: {en: 'Ph.D. in Astrophysics', fr: 'Ph.D. en Astrophysique'}},
+      {type: 'text', variant: 'subtitle', text: {en: '2021-2026', fr: '2021-2026'}},
       {type: 'text', variant: 'subtitle', text: {en: 'Thesis on predicting solar flares', fr: 'Thèse sur la prédiction des éruptions solaires'}},
       {type: 'link', href: 'https://www.umontreal.ca/', label: {en: 'University of Montreal', fr: 'Université de Montréal'}},
       {type: 'rule'},
       {type: 'text', variant: 'title', text: {en: 'Microprogram in indie video games', fr: 'Micropgrogramme en jeux vidéo indépendants'}},
+      {type: 'text', variant: 'subtitle', text: {en: '2025-2026', fr: '2025-2026'}},
       {type: 'link', href: 'https://www.uqat.ca/etudes/creation-et-nouveaux-medias/microprogramme-1er-cycle-en-jeu-video-independant/', label: {en: 'University of Quebec in Abitibi-Témiscamingue', fr: 'Université du Québec en Abitibi-Témiscamingue'}},
 
     ]
@@ -109,6 +113,9 @@ export const NODES: GraphNode[] = [
     id: 'recherche',
     kind: 'application',
     name: { fr: 'Recherche', en: 'Research' },
+    body: [
+      {type: 'model', src: '/models/Model5.glb', zoom: 1.5},
+    ]
   },
   {
     id: 'enseignement',
@@ -194,7 +201,7 @@ export const NODES: GraphNode[] = [
     kind: 'application',
     name: { fr: 'H0l0gram', en: 'H0l0gram' },
     body: [
-      {type: 'text', text: {en: 'H0l0gram is a musical project of Henri Lamarre, Clarence Egger and Laurier Lehoux-Blanc, born during their studies at the CEGEP of Saint-Laurent.', fr: 'H0l0fram est le projet musical de Henri Lamarre, Clarence Egger et Laurier Lehoux-Blanc, né lors de leur études au CEGEP de Saint-Laurent.'}},
+      {type: 'text', text: {en: 'H0l0gram is a musical project of Henri Lamarre, Clarence Egger and Laurier Lehoux-Blanc, born during their studies at the CEGEP of Saint-Laurent.', fr: 'H0l0gram est le projet musical de Henri Lamarre, Clarence Egger et Laurier Lehoux-Blanc, né lors de leur études au CEGEP de Saint-Laurent.'}},
       {type: 'rule'},
       {type: 'text', variant: 'title', text: {en: 'DEMO', fr: 'DEMO'}},
       { type: 'bandcamp', album: '1327541059'},
