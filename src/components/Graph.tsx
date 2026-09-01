@@ -16,6 +16,8 @@ import BlockList from './blocks/BlockList'
 
 /** Star size by kind: categories are the bright ones. */
 const RADIUS = { category: 7, application: 3.5 } as const
+/** Drawn size of a node's artwork, when it has one. */
+const ICON_SIZE = { category: 46, application: 28 } as const
 /** Space each node claims in the layout, so labels do not collide. */
 const CLEARANCE = { category: 62, application: 40 } as const
 
@@ -652,6 +654,9 @@ export default function Graph() {
             const isNeighbour = neighbours.has(node.id)
             const dimmed = selected !== null && !isSelected && !isNeighbour
             const r = RADIUS[node.kind]
+            // What the eye sees: the icon if there is one, otherwise the dot.
+            // Labels and the hit area key off this, not the underlying dot.
+            const visual = node.icon ? ICON_SIZE[node.kind] / 2 : r
 
             return (
               <g
@@ -672,20 +677,33 @@ export default function Graph() {
                 }`}
                 opacity={dimmed ? 0.25 : 1}
               >
-                {/* Generous invisible hit area — the stars themselves are tiny. */}
-                <circle r={Math.max(18, r * 3)} fill="transparent" />
+                {/* Generous invisible hit area — a bare star is tiny, and an
+                    icon should be clickable across its whole face. */}
+                <circle r={Math.max(18, r * 3, visual)} fill="transparent" />
                 <circle r={r * 5} fill="url(#halo)" />
-                <circle
-                  r={r}
-                  fill="#ffffff"
-                  stroke={isSelected || isNeighbour ? '#ffffff' : 'transparent'}
-                  strokeOpacity={0.5}
-                  strokeWidth={isSelected ? 2 : 1}
-                />
+
+                {node.icon ? (
+                  <image
+                    href={node.icon}
+                    x={-ICON_SIZE[node.kind] / 2}
+                    y={-ICON_SIZE[node.kind] / 2}
+                    width={ICON_SIZE[node.kind]}
+                    height={ICON_SIZE[node.kind]}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                ) : (
+                  <circle
+                    r={r}
+                    fill="#ffffff"
+                    stroke={isSelected || isNeighbour ? '#ffffff' : 'transparent'}
+                    strokeOpacity={0.5}
+                    strokeWidth={isSelected ? 2 : 1}
+                  />
+                )}
                 {/* Upper right of the star, 5px clear of its edge. */}
                 <text
-                  x={r + 5}
-                  y={-(r + 5)}
+                  x={visual + 5}
+                  y={-(visual + 5)}
                   textAnchor="start"
                   fill={node.kind === 'category' ? '#fff6dc' : '#c9b98a'}
                   className={`font-pixel select-none ${

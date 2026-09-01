@@ -168,6 +168,39 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
             )
           }
 
+          case 'bandcamp': {
+            const slim = block.layout === 'slim'
+            const target = block.album
+              ? `album=${block.album}`
+              : `track=${block.track ?? ''}`
+
+            // Bandcamp takes its palette from the path, and transparent=true
+            // drops its background so the player sits on the window itself.
+            const parts = [
+              target,
+              slim ? 'size=small' : 'size=large',
+              'bgcol=0a0803',
+              'linkcol=ffd873',
+              slim ? 'artwork=none' : 'artwork=small',
+              'transparent=true',
+            ]
+
+            return (
+              <LazyFrame
+                key={i}
+                className={slim ? 'h-[42px] w-full' : 'h-[470px] w-full max-w-[400px]'}
+              >
+                <iframe
+                  src={`https://bandcamp.com/EmbeddedPlayer/${parts.join('/')}/`}
+                  title={block.label ? t(block.label) : 'Bandcamp'}
+                  loading="lazy"
+                  seamless
+                  className="h-full w-full border-0"
+                />
+              </LazyFrame>
+            )
+          }
+
           case 'rule':
             return (
               <hr

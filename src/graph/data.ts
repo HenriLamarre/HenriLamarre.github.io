@@ -8,6 +8,12 @@ export type GraphNode = {
   id: string
   kind: NodeKind
   name: Text
+  /**
+   * Optional artwork replacing the star dot. Path under /public, .png or .svg.
+   * Loaded as an image, so it keeps its own colours: it dims with the rest of
+   * the graph but cannot be tinted by selection state.
+   */
+  icon?: string
   /** Lead paragraph shown in the window when the node is opened. */
   description?: Text
   /** The body of the window: text, images, links, video, 3D. */
@@ -30,6 +36,7 @@ export const NODES: GraphNode[] = [
       fr: 'Math et Physique.',
       en: 'Math and Physics.',
     },
+    icon: '/icons/study.png',
   },
   {
     id: 'programmation',
@@ -39,6 +46,7 @@ export const NODES: GraphNode[] = [
       fr: 'Python, C#, Fortran, Bash, etc.',
       en: 'Python, C#, Fortran, Bash, etc.',
     },
+    icon: '/icons/programmation.png',
   },
   {
     id: 'pedagogie',
@@ -48,6 +56,7 @@ export const NODES: GraphNode[] = [
       fr: 'Enseignement, vulgarisation et conférences.',
       en: 'Teaching, outreach and conferences.',
     },
+    icon: '/icons/pedagogie.png',
   },
   {
     id: 'modelisation',
@@ -57,6 +66,7 @@ export const NODES: GraphNode[] = [
       fr: 'Modélisation et simulation numérique.',
       en: 'Modeling and numerical simulation.',
     },
+    icon: '/icons/modelisation.png',
   },
   {
     id: 'musique',
@@ -66,6 +76,7 @@ export const NODES: GraphNode[] = [
       fr: 'Création et production musicale.',
       en: 'Music creation and production.',
     },
+    icon: '/icons/musique.png',
   },
 
   // Applications — smaller stars orbiting their category.
@@ -182,6 +193,22 @@ export const NODES: GraphNode[] = [
     id: 'h0l0gram',
     kind: 'application',
     name: { fr: 'H0l0gram', en: 'H0l0gram' },
+    body: [
+      {type: 'text', text: {en: 'H0l0gram is a musical project of Henri Lamarre, Clarence Egger and Laurier Lehoux-Blanc, born during their studies at the CEGEP of Saint-Laurent.', fr: 'H0l0fram est le projet musical de Henri Lamarre, Clarence Egger et Laurier Lehoux-Blanc, né lors de leur études au CEGEP de Saint-Laurent.'}},
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'DEMO', fr: 'DEMO'}},
+      { type: 'bandcamp', album: '1327541059'},
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Space Diffraction', fr: 'Space Diffraction'}},
+      { type: 'bandcamp', album: '438589102'},
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Journey', fr: 'Journey'}},
+      { type: 'bandcamp', album: '2238149068'},
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: '深夜Paragon', fr: '深夜Paragon'}},
+      { type: 'bandcamp', album: '791963209'},
+    ]
+
   },
   {
     id: 'klaxon',

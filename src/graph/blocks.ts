@@ -38,6 +38,20 @@ export type Block =
    * `https://itch.io/embed/4239580` → `'4239580'`.
    */
   | { type: 'itch'; id: string; label?: Text }
+  /**
+   * A Bandcamp player. `album` or `track` is the number in the embed code
+   * Bandcamp gives you: `EmbeddedPlayer/album=1234567890/…` → `'1234567890'`.
+   *
+   * `layout` picks the tall player with artwork and tracklist, or the slim
+   * one-line bar.
+   */
+  | {
+      type: 'bandcamp'
+      album?: string
+      track?: string
+      label?: Text
+      layout?: 'large' | 'slim'
+    }
   /** A full-width rule, for separating sections. */
   | { type: 'rule' }
 
@@ -58,6 +72,7 @@ export function blockTexts(block: Block): Array<[string, Text | undefined]> {
     case 'embed':
       return [['title', block.title]]
     case 'itch':
+    case 'bandcamp':
       return [['label', block.label]]
     case 'model':
     case 'rule':
