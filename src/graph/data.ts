@@ -123,7 +123,15 @@ export const NODES: GraphNode[] = [
       {type: 'video', youtube: 'cvYGijhQTRI', caption: { en: 'Video of the 2024 DÉRAPAGE competition', fr: 'Vidéo du concours DÉRAPAGE 2024' } },
       {type: 'text', variant: 'subtitle', text: {en: 'Model generated for the video', fr: 'Modèle généré pour la vidéo'}},
       {type: 'text', text: {en: 'Procedural model generated on blender with geometry nodes', fr: 'Modèle 3D procedural généré sur blender avec des geometry nodes' }},
-      {type: 'model', src: '/models/Model1.glb' }
+      {type: 'model', src: '/models/Model1.glb', zoom: 1.5},
+
+      {type: 'rule'},
+      {type: 'text', variant: 'title', text: {en: 'Dérapage 2025', fr: 'Dérapage 2025'}},
+      {type: 'text', variant: 'subtitle', text: {en: 'Spaghettification : aux origines du quotidien et de l\'infini', fr: 'Spaghettification : aux origines du quotidien et de l\'infini'}},
+      {type: 'video', youtube: 'XWf_XqVtyIc', caption: { en: 'Video of the 2025 DÉRAPAGE competition', fr: 'Vidéo du concours DÉRAPAGE 2025' } },
+      {type: 'text', variant: 'subtitle', text: {en: 'Model deformed procedurally for the video', fr: 'Modèle déformé procéduralement pour la vidéo'}},
+      {type: 'text', text: {en: 'Procedural model generated on blender with geometry nodes', fr: 'Modèle 3D procedural généré sur blender avec des geometry nodes' }},
+      {type: 'model', src: '/models/Model2.glb', zoom: 1.5}
 
     ]
   },

@@ -129,7 +129,7 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
                 className="mx-auto aspect-square w-full md:h-[44vh] md:w-auto"
               >
                 <Suspense fallback={null}>
-                  <ModelViewer src={block.src} render={block.render} />
+                  <ModelViewer src={block.src} zoom={block.zoom} render={block.render} />
                 </Suspense>
               </div>
             )

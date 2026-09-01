@@ -17,11 +17,13 @@ export type Block =
   /** Either a YouTube id or a file under /public. */
   | { type: 'video'; youtube?: string; src?: string; caption?: Text }
   /**
-   * A .glb under /public, shown in an orbitable viewer. `hologram` (the
-   * default) draws bright edges over a dark body; `shaded` renders the model's
-   * own materials.
+   * A .glb under /public, shown in an orbitable viewer.
+   *
+   * `zoom` scales the model in frame: 1 fits its longest side, above that
+   * fills more of the view. `render` picks the model's own materials with a
+   * glowing rim (default) or a wireframe reading of it.
    */
-  | { type: 'model'; src: string; render?: 'hologram' | 'shaded' }
+  | { type: 'model'; src: string; zoom?: number; render?: 'shaded' | 'hologram' }
   /** A full-width rule, for separating sections. */
   | { type: 'rule' }
 
