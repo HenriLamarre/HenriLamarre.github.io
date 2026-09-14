@@ -5,6 +5,9 @@ import {
   forceLink,
   forceManyBody,
   forceSimulation,
+  type ForceCollide,
+  type ForceLink,
+  type ForceManyBody,
   type Simulation,
   type SimulationLinkDatum,
   type SimulationNodeDatum,
@@ -32,6 +35,22 @@ const LABEL_GAP = { category: 13, application: 8 } as const
 const LABEL_OPACITY = { category: 1, application: 0.85 } as const
 /** Space each node claims in the layout, so labels do not collide. */
 const CLEARANCE = { category: 62, application: 40 } as const
+
+/**
+ * A phone cannot hold the desktop spacing: fifteen stars asking for up to
+ * 124px each, in the ~240px a phone leaves between the walls, never settle.
+ * The collide and wall forces fight for as long as the layout is warm — which
+ * is the whole time a star is being dragged — and that shows up as jitter.
+ *
+ * So everything that claims space scales with the viewport width: full size
+ * from `LAYOUT_FULL_WIDTH` up, down to `LAYOUT_SCALE_MIN` on a phone.
+ */
+const LAYOUT_FULL_WIDTH = 1100
+const LAYOUT_SCALE_MIN = 0.45
+
+function layoutScale(width: number) {
+  return Math.min(1, Math.max(LAYOUT_SCALE_MIN, width / LAYOUT_FULL_WIDTH))
+}
 
 /**
  * Keep-out distance from each edge. The right and top get more room because
@@ -174,6 +193,8 @@ export default function Graph() {
   /** Cursor position, and how far it moved since the last frame. */
   const pointerRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, active: false })
 
+  /** Current share of the desktop spacing, read by the force accessors. */
+  const scaleRef = useRef(1)
   /** Latest size, read by the forces so they never close over a stale value. */
   const sizeRef = useRef({ width: 0, height: 0 })
   /** Chrome boxes in container coordinates, so stars can be kept out of them. */
@@ -239,6 +260,7 @@ export default function Graph() {
   useEffect(() => {
     if (!ready) return
 
+    scaleRef.current = layoutScale(sizeRef.current.width)
     const simNodes: SimNode[] = NODES.map((node) => ({ ...node }))
     const simLinks: SimLink[] = LINKS.map((link) => ({ ...link }))
 
@@ -253,7 +275,7 @@ export default function Graph() {
             const target = link.target as SimNode
             const bothCategories =
               source.kind === 'category' && target.kind === 'category'
-            return bothCategories ? 260 : 110
+            return (bothCategories ? 260 : 110) * scaleRef.current
           })
           .strength((link) => {
             const source = link.source as SimNode
@@ -264,7 +286,12 @@ export default function Graph() {
       .force(
         'charge',
         forceManyBody<SimNode>()
-          .strength((node) => (node.kind === 'category' ? -900 : -320))
+          // Squared: repulsion falls off with distance while the links pull
+          // linearly, so halving every distance takes a quarter the charge to
+          // hold the same shape.
+          .strength(
+            (node) => (node.kind === 'category' ? -900 : -320) * scaleRef.current ** 2,
+          )
           // Cap the range so distant stars stop nudging each other, which is a
           // common source of low-level jitter.
           .distanceMax(520),
@@ -279,7 +306,7 @@ export default function Graph() {
       .force(
         'collide',
         forceCollide<SimNode>()
-          .radius((node) => CLEARANCE[node.kind])
+          .radius((node) => CLEARANCE[node.kind] * scaleRef.current)
           // Softer separation: a hard collide fights the other forces and
           // shows up as vibration between neighbours.
           .strength(0.55)
@@ -417,6 +444,8 @@ export default function Graph() {
     let idleTimer: number | undefined
 
     const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') return
+
       const rect = element?.getBoundingClientRect()
       if (!rect) return
 
@@ -463,10 +492,27 @@ export default function Graph() {
     const simulation = simulationRef.current
     if (!simulation || !ready) return
 
-    simulation.stop()
-
     const centre = simulation.force('centre') as ReturnType<typeof forceCenter> | null
     centre?.x(size.width / 2)?.y(size.height / 2)
+
+    const scale = layoutScale(size.width)
+    if (scale !== scaleRef.current) {
+      scaleRef.current = scale
+      // d3 caches what an accessor returns; setting it again re-reads it.
+      const link = simulation.force('link') as ForceLink<SimNode, SimLink> | undefined
+      link?.distance(link.distance())
+      const charge = simulation.force('charge') as ForceManyBody<SimNode> | undefined
+      charge?.strength(charge.strength())
+      const collide = simulation.force('collide') as ForceCollide<SimNode> | undefined
+      collide?.radius(collide.radius())
+    }
+
+    // On a phone the address bar can show or hide mid-drag, which resizes the
+    // viewport. Freezing then would stop the star under the finger and jump it
+    // when the layout resumed; a drag keeps the layout running anyway.
+    if (dragRef.current) return
+
+    simulation.stop()
 
     const timer = setTimeout(() => simulation.alpha(0.3).restart(), RESIZE_SETTLE_MS)
     return () => clearTimeout(timer)
@@ -510,7 +556,11 @@ export default function Graph() {
       simulation.alphaTarget(0.25).restart()
     }
 
-    const onPointerUp = () => {
+    /**
+     * Ends a drag. A cancelled pointer — the browser claiming the gesture, a
+     * call coming in — releases the star but never counts as a click.
+     */
+    const release = (cancelled: boolean) => {
       const drag = dragRef.current
       const simulation = simulationRef.current
       dragRef.current = null
@@ -527,18 +577,23 @@ export default function Graph() {
       simulation.alphaTarget(0)
 
       // Treat a near-stationary press as a click.
-      if (drag.moved < 5) {
+      if (!cancelled && drag.moved < 5) {
         setSelected((current) => (current === drag.id ? null : drag.id))
       } else {
         simulation.alpha(0.3).restart()
       }
     }
 
+    const onPointerUp = () => release(false)
+    const onPointerCancel = () => release(true)
+
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerCancel)
     return () => {
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerCancel)
     }
   }, [])
 
@@ -640,7 +695,7 @@ export default function Graph() {
       <svg
         width={size.width}
         height={size.height}
-        className="absolute inset-0"
+        className="absolute inset-0 touch-none"
         onPointerDown={() => setSelected(null)}
       >
         <defs>
