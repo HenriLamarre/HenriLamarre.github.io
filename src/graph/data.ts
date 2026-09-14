@@ -6,14 +6,12 @@ export type NodeKind = 'category' | 'application'
 export type GraphNode = {
   /** Never translated — this is what links refer to. */
   id: string
+  /**
+   * Also what colours the star: categories carry the palette, applications
+   * take the blend of the categories they link to. See ./palette.ts.
+   */
   kind: NodeKind
   name: Text
-  /**
-   * Optional artwork replacing the star dot. Path under /public, .png or .svg.
-   * Loaded as an image, so it keeps its own colours: it dims with the rest of
-   * the graph but cannot be tinted by selection state.
-   */
-  icon?: string
   /** Lead paragraph shown in the window when the node is opened. */
   description?: Text
   /** The body of the window: text, images, links, video, 3D. */
@@ -36,7 +34,6 @@ export const NODES: GraphNode[] = [
       fr: 'Math et Physique.',
       en: 'Math and Physics.',
     },
-    icon: '/icons/study.png',
   },
   {
     id: 'programmation',
@@ -46,7 +43,6 @@ export const NODES: GraphNode[] = [
       fr: 'Python, C#, Fortran, Bash, etc.',
       en: 'Python, C#, Fortran, Bash, etc.',
     },
-    icon: '/icons/programmation.png',
   },
   {
     id: 'pedagogie',
@@ -56,7 +52,6 @@ export const NODES: GraphNode[] = [
       fr: 'Enseignement, vulgarisation et conférences.',
       en: 'Teaching, outreach and conferences.',
     },
-    icon: '/icons/pedagogie.png',
   },
   {
     id: 'modelisation',
@@ -66,7 +61,6 @@ export const NODES: GraphNode[] = [
       fr: 'Modélisation et simulation numérique.',
       en: 'Modeling and numerical simulation.',
     },
-    icon: '/icons/modelisation.png',
   },
   {
     id: 'musique',
@@ -76,7 +70,6 @@ export const NODES: GraphNode[] = [
       fr: 'Création et production musicale.',
       en: 'Music creation and production.',
     },
-    icon: '/icons/musique.png',
   },
 
   // Applications — smaller stars orbiting their category.

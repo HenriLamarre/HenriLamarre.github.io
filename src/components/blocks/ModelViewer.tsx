@@ -17,6 +17,7 @@ import {
   type Matrix4,
 } from 'three'
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { SURFACE, panelTones } from '../../graph/palette'
 
 /** Faces meeting at a sharper angle than this produce a drawn edge. */
 const EDGE_THRESHOLD = 24
@@ -24,9 +25,7 @@ const EDGE_THRESHOLD = 24
 const DENSE_TRIANGLES = 120_000
 const DENSE_EDGE_THRESHOLD = 48
 
-const LINE_COLOUR = '#ffd873'
-const RIM_COLOUR = '#f3eee3'
-const FILL_COLOUR = '#0a0803'
+// Line and rim colours come from the window's accent; see ModelViewer below.
 /** How much of the model's own material shows through. */
 const SURFACE_OPACITY = 0.3
 
@@ -71,11 +70,11 @@ const RIM_SHADER = {
   `,
 }
 
-function rimOverlayMaterial() {
+function rimOverlayMaterial(rim: string) {
   return new ShaderMaterial({
     vertexShader: RIM_SHADER.vertex,
     fragmentShader: RIM_SHADER.overlayFragment,
-    uniforms: { rim: { value: new Color(RIM_COLOUR) } },
+    uniforms: { rim: { value: new Color(rim) } },
     transparent: true,
     blending: AdditiveBlending,
     depthWrite: false,
@@ -99,7 +98,7 @@ function framing(bounds: Box3, zoom: number) {
  * original shading is untouched and the geometry is never read on the CPU —
  * which matters, since these meshes are meshopt-quantised.
  */
-function Shaded({ src, zoom }: { src: string; zoom: number }) {
+function Shaded({ src, zoom, rim }: { src: string; zoom: number; rim: string }) {
   const { scene } = useGLTF(src)
 
   const { object, position, scale } = useMemo(() => {
@@ -124,13 +123,13 @@ function Shaded({ src, zoom }: { src: string; zoom: number }) {
       material.depthWrite = true
       mesh.material = material
 
-      const rim = new Mesh(mesh.geometry, rimOverlayMaterial())
-      rim.renderOrder = 1
-      mesh.add(rim)
+      const overlay = new Mesh(mesh.geometry, rimOverlayMaterial(rim))
+      overlay.renderOrder = 1
+      mesh.add(overlay)
     }
 
     return { object: clone, ...framing(new Box3().setFromObject(clone), zoom) }
-  }, [scene, zoom])
+  }, [scene, zoom, rim])
 
   return (
     <>
@@ -173,7 +172,17 @@ function worldPositions(source: BufferGeometry, matrix: Matrix4): BufferGeometry
 }
 
 /** Bright creases over a dark rim-lit body. */
-function Hologram({ src, zoom }: { src: string; zoom: number }) {
+function Hologram({
+  src,
+  zoom,
+  line,
+  rim,
+}: {
+  src: string
+  zoom: number
+  line: string
+  rim: string
+}) {
   const { scene } = useGLTF(src)
 
   const { pieces, position, scale } = useMemo(() => {
@@ -217,8 +226,8 @@ function Hologram({ src, zoom }: { src: string; zoom: number }) {
               vertexShader={RIM_SHADER.vertex}
               fragmentShader={RIM_SHADER.bodyFragment}
               uniforms={{
-                base: { value: new Color(FILL_COLOUR) },
-                rim: { value: new Color(RIM_COLOUR) },
+                base: { value: new Color(SURFACE.panel) },
+                rim: { value: new Color(rim) },
               }}
               side={DoubleSide}
               polygonOffset
@@ -228,7 +237,7 @@ function Hologram({ src, zoom }: { src: string; zoom: number }) {
           </mesh>
           <lineSegments geometry={piece.edges}>
             <lineBasicMaterial
-              color={LINE_COLOUR}
+              color={line}
               transparent
               opacity={0.45}
               blending={AdditiveBlending}
@@ -245,18 +254,23 @@ export default function ModelViewer({
   src,
   zoom = 1,
   render = 'shaded',
+  accent,
 }: {
   src: string
   zoom?: number
   render?: 'shaded' | 'hologram'
+  /** The open window's colour: the creases take it, the rim a pale tint of it. */
+  accent: string
 }) {
+  const rim = panelTones(accent).strong
+
   return (
     <Canvas camera={{ position: [0, 0, 4] }} gl={{ alpha: true }} dpr={[1, 2]}>
       <Suspense fallback={null}>
         {render === 'hologram' ? (
-          <Hologram src={src} zoom={zoom} />
+          <Hologram src={src} zoom={zoom} line={accent} rim={rim} />
         ) : (
-          <Shaded src={src} zoom={zoom} />
+          <Shaded src={src} zoom={zoom} rim={rim} />
         )}
       </Suspense>
       <OrbitControls

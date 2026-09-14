@@ -64,10 +64,12 @@ button:disabled {
   outline: none;
 }
 
-/* HUD scrollbar: a thin glowing bar in a recessed track, square ends. */
+/* HUD scrollbar: a thin glowing bar in a recessed track, square ends. Tinted
+   by the --accent properties the window sets from its star's colour. */
 .hud-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 244, 205, 0.78) rgba(255, 255, 255, 0.04);
+  scrollbar-color: color-mix(in srgb, var(--accent-strong) 78%, transparent)
+    rgba(255, 255, 255, 0.04);
   /* Chrome makes a scrollable box focusable so it can be scrolled by keyboard,
      which shows a blinking caret in it. Hide the caret, keep the behaviour. */
   caret-color: transparent;
@@ -80,23 +82,25 @@ button:disabled {
 
 .hud-scroll::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.03);
-  border-left: 1px solid rgba(255, 238, 190, 0.25);
+  border-left: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .hud-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 246, 214, 0.82);
-  border: 1px solid rgba(255, 252, 235, 0.9);
+  background: color-mix(in srgb, var(--accent-strong) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-strong) 90%, transparent);
   box-shadow:
-    0 0 6px rgba(255, 219, 130, 0.9),
-    0 0 14px rgba(255, 196, 70, 0.5);
+    0 0 6px color-mix(in srgb, var(--accent) 90%, transparent),
+    0 0 14px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .hud-scroll::-webkit-scrollbar-thumb:hover {
-  background: #ffffff;
+  background: var(--accent-strong);
 }
 
 body {
   margin: 0;
   min-height: 100dvh;
-  background: #000000;
+  /* Matches SURFACE.background in src/graph/palette.ts, which is the source
+     of truth; this only covers the moment before React paints. */
+  background: #07070a;
 }

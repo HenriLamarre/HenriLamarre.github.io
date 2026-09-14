@@ -12,7 +12,7 @@ export function inlineMarkup(source: string): ReactNode {
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return (
-        <strong key={i} className="text-[#fff6dc]">
+        <strong key={i} className="text-(--accent-strong)">
           {part.slice(2, -2)}
         </strong>
       )
@@ -24,7 +24,7 @@ export function inlineMarkup(source: string): ReactNode {
 
     if (part.startsWith('`') && part.endsWith('`')) {
       return (
-        <code key={i} className="bg-white/10 px-1 text-[#fff6dc]">
+        <code key={i} className="bg-(--accent)/10 px-1 text-(--accent-strong)">
           {part.slice(1, -1)}
         </code>
       )
@@ -38,7 +38,7 @@ export function inlineMarkup(source: string): ReactNode {
           href={link[2]}
           target="_blank"
           rel="noopener noreferrer"
-          className="border-b border-white/40 text-[#fff6dc] hover:border-white"
+          className="border-b border-(--accent)/40 text-(--accent-strong) hover:border-(--accent)"
         >
           {link[1]}
         </a>

@@ -10,14 +10,26 @@ import {
   type SimulationNodeDatum,
 } from 'd3-force'
 import { LINKS, NODES, type GraphNode, type NodeKind } from '../graph/data'
+import {
+  GLOW,
+  GLOW_STOPS,
+  LINK_OPACITY,
+  NODE_COLOURS,
+  SURFACE,
+  linkColour,
+  nodeColour,
+  panelColours,
+} from '../graph/palette'
 import { useLocale } from '../i18n/locale'
 import { UI } from '../i18n/ui'
 import BlockList from './blocks/BlockList'
 
 /** Star size by kind: categories are the bright ones. */
-const RADIUS = { category: 7, application: 3.5 } as const
-/** Drawn size of a node's artwork, when it has one. */
-const ICON_SIZE = { category: 46, application: 28 } as const
+const RADIUS = { category: 8.5, application: 5 } as const
+/** Gap between a star's edge and its label, clear of the tight bloom. */
+const LABEL_GAP = { category: 13, application: 8 } as const
+/** Labels carry the star's colour; an application's sits a little back. */
+const LABEL_OPACITY = { category: 1, application: 0.85 } as const
 /** Space each node claims in the layout, so labels do not collide. */
 const CLEARANCE = { category: 62, application: 40 } as const
 
@@ -110,6 +122,18 @@ function endpointId(endpoint: SimLink['source']): string {
   return typeof endpoint === 'object' ? (endpoint as SimNode).id : String(endpoint)
 }
 
+/** Gradient id for a colour's bloom, shared by every star wearing it. */
+function glowId(colour: string): string {
+  return `glow-${colour.replace('#', '')}`
+}
+
+/**
+ * The distinct colours in play. Far fewer than there are stars — siblings of
+ * the same categories come out identical — so the gradients are declared per
+ * colour and reused.
+ */
+const GLOW_COLOURS = [...new Set(Object.values(NODE_COLOURS))]
+
 /** The small filled blocks that sit on each corner of a HUD frame. */
 function CornerMarks() {
   const positions = [
@@ -125,8 +149,11 @@ function CornerMarks() {
         <span
           key={i}
           aria-hidden
-          className="pointer-events-none absolute h-[10px] w-[10px] bg-white"
-          style={{ ...position, boxShadow: '0 0 8px rgba(255, 219, 130, 0.9)' }}
+          className="pointer-events-none absolute h-[10px] w-[10px] bg-(--accent-strong)"
+          style={{
+            ...position,
+            boxShadow: '0 0 8px color-mix(in srgb, var(--accent) 90%, transparent)',
+          }}
         />
       ))}
     </>
@@ -547,7 +574,11 @@ export default function Graph() {
   }, [selected, neighbours])
 
   return (
-    <div ref={containerRef} className="relative h-dvh w-full overflow-hidden bg-black">
+    <div
+      ref={containerRef}
+      className="relative h-dvh w-full overflow-hidden"
+      style={{ backgroundColor: SURFACE.background }}
+    >
       {/* Site title, top left. Fades out while a window is open. */}
       <header
         ref={titleRef}
@@ -613,12 +644,19 @@ export default function Graph() {
         onPointerDown={() => setSelected(null)}
       >
         <defs>
-          {/* Soft halo, so the stars glow rather than sit flat. */}
-          <radialGradient id="halo">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
-            <stop offset="45%" stopColor="#ffe9a8" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="#ffe9a8" stopOpacity="0" />
-          </radialGradient>
+          {/* One soft bloom per colour, so the stars glow rather than sit flat. */}
+          {GLOW_COLOURS.map((colour) => (
+            <radialGradient key={colour} id={glowId(colour)}>
+              {GLOW_STOPS.map((stop) => (
+                <stop
+                  key={stop.offset}
+                  offset={stop.offset}
+                  stopColor={colour}
+                  stopOpacity={stop.opacity}
+                />
+              ))}
+            </radialGradient>
+          ))}
         </defs>
 
         <g>
@@ -631,6 +669,7 @@ export default function Graph() {
               selected !== null &&
               (endpointId(link.source) === selected || endpointId(link.target) === selected)
             const dimmed = selected !== null && !touchesSelected
+            const colour = linkColour(endpointId(link.source), endpointId(link.target))
 
             return (
               <line
@@ -639,9 +678,15 @@ export default function Graph() {
                 y1={source.y}
                 x2={target.x}
                 y2={target.y}
-                stroke={touchesSelected ? '#fff3cd' : '#a8975f'}
+                stroke={colour}
                 strokeWidth={touchesSelected ? 1.6 : 0.7}
-                strokeOpacity={dimmed ? 0.08 : touchesSelected ? 0.85 : 0.28}
+                strokeOpacity={
+                  dimmed
+                    ? LINK_OPACITY.dimmed
+                    : touchesSelected
+                      ? LINK_OPACITY.active
+                      : LINK_OPACITY.rest
+                }
                 className="transition-[stroke-opacity,stroke-width] duration-300"
               />
             )
@@ -654,9 +699,8 @@ export default function Graph() {
             const isNeighbour = neighbours.has(node.id)
             const dimmed = selected !== null && !isSelected && !isNeighbour
             const r = RADIUS[node.kind]
-            // What the eye sees: the icon if there is one, otherwise the dot.
-            // Labels and the hit area key off this, not the underlying dot.
-            const visual = node.icon ? ICON_SIZE[node.kind] / 2 : r
+            const colour = nodeColour(node.id)
+            const glow = GLOW[node.kind]
 
             return (
               <g
@@ -677,35 +721,32 @@ export default function Graph() {
                 }`}
                 opacity={dimmed ? 0.25 : 1}
               >
-                {/* Generous invisible hit area — a bare star is tiny, and an
-                    icon should be clickable across its whole face. */}
-                <circle r={Math.max(18, r * 3, visual)} fill="transparent" />
-                <circle r={r * 5} fill="url(#halo)" />
+                {/* Generous invisible hit area — a star is small, and the
+                    bloom around it reads as part of the target. */}
+                <circle r={Math.max(18, r * 3)} fill="transparent" />
 
-                {node.icon ? (
-                  <image
-                    href={node.icon}
-                    x={-ICON_SIZE[node.kind] / 2}
-                    y={-ICON_SIZE[node.kind] / 2}
-                    width={ICON_SIZE[node.kind]}
-                    height={ICON_SIZE[node.kind]}
-                    preserveAspectRatio="xMidYMid meet"
-                  />
-                ) : (
-                  <circle
-                    r={r}
-                    fill="#ffffff"
-                    stroke={isSelected || isNeighbour ? '#ffffff' : 'transparent'}
-                    strokeOpacity={0.5}
-                    strokeWidth={isSelected ? 2 : 1}
-                  />
-                )}
-                {/* Upper right of the star, 5px clear of its edge. */}
+                {/* The bloom: one wide faint pass, then a tight bright one. */}
+                <circle
+                  r={r + glow.outer}
+                  fill={`url(#${glowId(colour)})`}
+                  opacity={glow.outerOpacity}
+                />
+                <circle r={r + glow.inner} fill={`url(#${glowId(colour)})`} />
+
+                <circle
+                  r={r}
+                  fill={colour}
+                  stroke={isSelected || isNeighbour ? '#ffffff' : 'transparent'}
+                  strokeOpacity={0.5}
+                  strokeWidth={isSelected ? 2 : 1}
+                />
+                {/* Upper right of the star, clear of its tight bloom. */}
                 <text
-                  x={visual + 5}
-                  y={-(visual + 5)}
+                  x={r + LABEL_GAP[node.kind]}
+                  y={-(r + LABEL_GAP[node.kind])}
                   textAnchor="start"
-                  fill={node.kind === 'category' ? '#fff6dc' : '#c9b98a'}
+                  fill={colour}
+                  fillOpacity={LABEL_OPACITY[node.kind]}
                   className={`font-pixel select-none ${
                     node.kind === 'category' ? 'text-base' : 'text-xs'
                   }`}
@@ -721,13 +762,20 @@ export default function Graph() {
 
       {selectedNode && (
         <article
-          className="hud-panel absolute flex flex-col bg-[#0a0702]/72 text-slate-100 backdrop-blur-md"
+          className="hud-panel absolute flex flex-col text-slate-100 backdrop-blur-md transition-[border-color,box-shadow] duration-300"
           style={{
             ...panelRect(size, selectedNode.kind),
+            // The window wears the colour of the star that opened it. Every
+            // tone inside is read from these properties.
+            ...panelColours(nodeColour(selectedNode.id)),
             position: 'absolute',
-            border: '1px solid rgba(255, 246, 214, 0.85)',
-            boxShadow:
-              '0 0 10px rgba(255, 219, 130, 0.45), 0 0 34px rgba(255, 190, 60, 0.22), inset 0 0 26px rgba(255, 214, 120, 0.07)',
+            backgroundColor: `color-mix(in srgb, ${SURFACE.panel} 72%, transparent)`,
+            border: '1px solid color-mix(in srgb, var(--accent-strong) 85%, transparent)',
+            boxShadow: [
+              '0 0 10px color-mix(in srgb, var(--accent) 45%, transparent)',
+              '0 0 34px color-mix(in srgb, var(--accent) 22%, transparent)',
+              'inset 0 0 26px color-mix(in srgb, var(--accent) 7%, transparent)',
+            ].join(', '),
           }}
         >
           <CornerMarks />
@@ -735,7 +783,7 @@ export default function Graph() {
           {/* Faint inner frame, as in the reference. */}
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-[6px] border border-white/12"
+            className="pointer-events-none absolute inset-[6px] border border-(--accent)/12"
           />
 
           <header
@@ -748,11 +796,12 @@ export default function Graph() {
                 <nav className="font-pixel mb-1 flex flex-wrap items-center gap-2 text-sm tracking-[0.1em]">
                   {parentCategories.map((category, i) => (
                     <span key={category.id} className="flex items-center gap-2">
-                      {i > 0 && <span className="text-[#7d6f45]">/</span>}
+                      {i > 0 && <span className="text-(--accent-dim)">/</span>}
                       <button
                         type="button"
                         onClick={() => setSelected(category.id)}
-                        className="text-[#c9b98a] transition hover:text-[#fff6dc]"
+                        className="opacity-75 transition hover:opacity-100"
+                        style={{ color: nodeColour(category.id) }}
                       >
                         {t(category.name)}
                       </button>
@@ -762,7 +811,7 @@ export default function Graph() {
               )}
 
               <h2
-                className="font-pixel tracking-[0.12em] uppercase"
+                className="font-pixel tracking-[0.12em] text-(--accent) uppercase"
                 style={{ fontSize: 'clamp(18px, 1.9vw, 32px)' }}
               >
                 {t(selectedNode.name)}
@@ -773,7 +822,7 @@ export default function Graph() {
             <button
               type="button"
               onClick={() => setSelected(null)}
-              className="relative aspect-square shrink-0 border border-white/25 text-slate-300 transition hover:border-white/70 hover:bg-white/10 hover:text-white"
+              className="relative aspect-square shrink-0 border border-(--accent)/30 text-(--accent-muted) transition hover:border-(--accent)/80 hover:bg-(--accent)/10 hover:text-(--accent-strong)"
               style={{ width: 'clamp(38px, 3.4vw, 60px)' }}
               aria-label={t(UI.close)}
             >
@@ -809,8 +858,8 @@ export default function Graph() {
           {/* Glowing rule under the header. */}
           <span
             aria-hidden
-            className="mx-6 block h-px shrink-0 bg-white/60"
-            style={{ boxShadow: '0 0 6px rgba(255, 219, 130, 0.85)' }}
+            className="mx-6 block h-px shrink-0 bg-(--accent-strong)/60"
+            style={{ boxShadow: '0 0 6px color-mix(in srgb, var(--accent) 85%, transparent)' }}
           />
 
           {/* Scrolls independently, so a project can carry as much as it needs. */}
@@ -826,7 +875,7 @@ export default function Graph() {
 
                 {selectedNode.body && selectedNode.body.length > 0 && (
                   <div className="mt-5">
-                    <BlockList blocks={selectedNode.body} />
+                    <BlockList blocks={selectedNode.body} accent={nodeColour(selectedNode.id)} />
                   </div>
                 )}
               </>
@@ -837,7 +886,7 @@ export default function Graph() {
                 href={selectedNode.link.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-6 inline-block border-b border-white/40 text-sm hover:border-white"
+                className="mt-6 inline-block border-b border-(--accent)/40 text-sm text-(--accent-strong) hover:border-(--accent)"
               >
                 {t(selectedNode.link.label)} ↗
               </a>
@@ -851,14 +900,16 @@ export default function Graph() {
                       <button
                         type="button"
                         onClick={() => setSelected(application.id)}
-                        className="group flex w-full items-baseline gap-3 border-b border-white/10 py-2 text-left transition hover:border-white/40"
+                        className="group flex w-full items-baseline gap-3 border-b border-(--accent)/15 py-2 text-left transition hover:border-(--accent)/50"
                       >
-                        <span className="text-[#c9b98a] transition group-hover:text-[#fff6dc]">
+                        <span className="text-(--accent-muted) transition group-hover:text-(--accent-strong)">
                           →
                         </span>
-                        <span className="text-[#fff6dc]">{t(application.name)}</span>
+                        <span style={{ color: nodeColour(application.id) }}>
+                          {t(application.name)}
+                        </span>
                         {application.description && (
-                          <span className="ml-auto truncate pl-6 text-xs text-[#a8975f]">
+                          <span className="ml-auto truncate pl-6 text-xs text-(--accent-faint)">
                             {t(application.description)}
                           </span>
                         )}
@@ -873,20 +924,20 @@ export default function Graph() {
           {/* Step through entries without going back to the constellation. */}
           {selectedNode.kind === 'application' && applications.length > 1 && (
             <footer
-              className="relative flex shrink-0 items-center justify-between border-t border-white/10 font-mono text-sm select-none"
+              className="relative flex shrink-0 items-center justify-between border-t border-(--accent)/15 font-mono text-sm select-none"
               style={{ padding: 'clamp(10px, 1.1vw, 18px) clamp(18px, 2.2vw, 40px)' }}
             >
               <button
                 type="button"
                 onClick={() => cycle(-1)}
-                className="text-[#c9b98a] transition hover:text-[#fff6dc]"
+                className="text-(--accent-muted) transition hover:text-(--accent-strong)"
               >
                 ‹ {t(UI.previous)}
               </button>
               <button
                 type="button"
                 onClick={() => cycle(1)}
-                className="text-[#c9b98a] transition hover:text-[#fff6dc]"
+                className="text-(--accent-muted) transition hover:text-(--accent-strong)"
               >
                 {t(UI.next)} ›
               </button>

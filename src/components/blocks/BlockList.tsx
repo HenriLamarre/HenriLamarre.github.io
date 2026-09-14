@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import type { Block } from '../../graph/blocks'
+import { SURFACE } from '../../graph/palette'
 import { useLocale } from '../../i18n/locale'
 import { inlineMarkup } from './inline'
 import LazyFrame from './LazyFrame'
@@ -8,7 +9,7 @@ import LazyFrame from './LazyFrame'
 const ModelViewer = lazy(() => import('./ModelViewer'))
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <figcaption className="mt-2 text-xs text-[#a8975f]">{children}</figcaption>
+  return <figcaption className="mt-2 text-xs text-(--accent-faint)">{children}</figcaption>
 }
 
 /** A framed box, matching the HUD look of the window itself. */
@@ -22,13 +23,18 @@ function Frame({
   style?: React.CSSProperties
 }) {
   return (
-    <div className={`border border-white/15 bg-black/30 ${className}`} style={style}>
+    <div className={`border border-(--accent)/20 bg-black/30 ${className}`} style={style}>
       {children}
     </div>
   )
 }
 
-export default function BlockList({ blocks }: { blocks: Block[] }) {
+/**
+ * Colours come from the window's CSS custom properties. `accent` is passed as
+ * well for what cannot read them: the 3D viewer and third-party embeds, which
+ * take their colours as values.
+ */
+export default function BlockList({ blocks, accent }: { blocks: Block[]; accent: string }) {
   const { t } = useLocale()
 
   return (
@@ -42,7 +48,7 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
               return (
                 <h3
                   key={i}
-                  className="font-pixel mt-2 text-xl tracking-[0.12em] text-[#fff6dc] uppercase"
+                  className="font-pixel mt-2 text-xl tracking-[0.12em] text-(--accent-strong) uppercase"
                 >
                   {content}
                 </h3>
@@ -53,7 +59,7 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
               return (
                 <h4
                   key={i}
-                  className="font-pixel text-sm tracking-[0.16em] text-[#c9b98a] uppercase"
+                  className="font-pixel text-sm tracking-[0.16em] text-(--accent-muted) uppercase"
                 >
                   {content}
                 </h4>
@@ -89,7 +95,7 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
                   href={block.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block border-b border-white/40 text-sm text-[#fff6dc] transition hover:border-white"
+                  className="inline-block border-b border-(--accent)/40 text-sm text-(--accent-strong) transition hover:border-(--accent)"
                 >
                   {t(block.label)} ↗
                 </a>
@@ -149,10 +155,10 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
             // be tuned to the page instead of arriving in its default grey.
             const colours = new URLSearchParams({
               linkback: 'true',
-              bg_color: '0a0803',
+              bg_color: SURFACE.panel.slice(1),
               fg_color: 'f4f4f6',
-              link_color: 'ffd873',
-              border_color: '3a3225',
+              link_color: accent.slice(1),
+              border_color: SURFACE.hairline.slice(1),
             })
 
             return (
@@ -179,8 +185,8 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
             const parts = [
               target,
               slim ? 'size=small' : 'size=large',
-              'bgcol=0a0803',
-              'linkcol=ffd873',
+              `bgcol=${SURFACE.panel.slice(1)}`,
+              `linkcol=${accent.slice(1)}`,
               slim ? 'artwork=none' : 'artwork=small',
               'transparent=true',
             ]
@@ -205,8 +211,8 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
             return (
               <hr
                 key={i}
-                className="my-2 border-0 border-t border-white/25"
-                style={{ boxShadow: '0 0 6px rgba(255, 219, 130, 0.35)' }}
+                className="my-2 border-0 border-t border-(--accent)/30"
+                style={{ boxShadow: '0 0 6px color-mix(in srgb, var(--accent) 35%, transparent)' }}
               />
             )
 
@@ -220,7 +226,12 @@ export default function BlockList({ blocks }: { blocks: Block[] }) {
                 className="mx-auto aspect-square w-full md:h-[44vh] md:w-auto"
               >
                 <Suspense fallback={null}>
-                  <ModelViewer src={block.src} zoom={block.zoom} render={block.render} />
+                  <ModelViewer
+                    src={block.src}
+                    zoom={block.zoom}
+                    render={block.render}
+                    accent={accent}
+                  />
                 </Suspense>
               </div>
             )
