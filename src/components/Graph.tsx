@@ -46,7 +46,7 @@ const CLEARANCE = { category: 62, application: 40 } as const
  * from `LAYOUT_FULL_WIDTH` up, down to `LAYOUT_SCALE_MIN` on a phone.
  */
 const LAYOUT_FULL_WIDTH = 1100
-const LAYOUT_SCALE_MIN = 0.45
+const LAYOUT_SCALE_MIN = 0.65
 
 function layoutScale(width: number) {
   return Math.min(1, Math.max(LAYOUT_SCALE_MIN, width / LAYOUT_FULL_WIDTH))
@@ -587,13 +587,25 @@ export default function Graph() {
     const onPointerUp = () => release(false)
     const onPointerCancel = () => release(true)
 
+    // A touch that starts on a star belongs to the drag; one that starts on
+    // empty sky is left to the browser, so pull-to-refresh and zoom still work
+    // there. The stars' touch-action says the same, but not every mobile
+    // browser honours it on SVG elements — cancelling the touchstart does.
+    // It has to be a native, non-passive listener: React's are passive.
+    const element = containerRef.current
+    const onTouchStart = (event: TouchEvent) => {
+      if ((event.target as Element | null)?.closest?.('[data-star]')) event.preventDefault()
+    }
+
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)
     window.addEventListener('pointercancel', onPointerCancel)
+    element?.addEventListener('touchstart', onTouchStart, { passive: false })
     return () => {
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)
       window.removeEventListener('pointercancel', onPointerCancel)
+      element?.removeEventListener('touchstart', onTouchStart)
     }
   }, [])
 
@@ -695,7 +707,7 @@ export default function Graph() {
       <svg
         width={size.width}
         height={size.height}
-        className="absolute inset-0 touch-none"
+        className="absolute inset-0"
         onPointerDown={() => setSelected(null)}
       >
         <defs>
@@ -771,7 +783,8 @@ export default function Graph() {
                   }
                   setDragging(true)
                 }}
-                className={`transition-opacity duration-300 ${
+                data-star
+                className={`touch-none transition-opacity duration-300 ${
                   dragging ? 'cursor-grabbing' : 'cursor-pointer'
                 }`}
                 opacity={dimmed ? 0.25 : 1}
