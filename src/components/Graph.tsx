@@ -139,8 +139,12 @@ const POINTER_IDLE_MS = 220
  * and then fades over NAME_FADE_MS. Appearing always takes NAME_SHOW_MS. These
  * drive both the CSS transitions and the minigame's idea of what is on screen,
  * so the two cannot drift apart.
+ *
+ * The wait is longer on a device that cannot hover, like a phone: there, names
+ * only come up by touching a star or opening a category, which is slower to
+ * work through, so the minigame needs the extra time to be doable.
  */
-const NAME_HIDE_DELAY_MS = 5000
+const NAME_HIDE_DELAY_MS = window.matchMedia('(hover: none)').matches ? 8000 : 5000
 const NAME_FADE_MS = 1000
 const NAME_SHOW_MS = 200
 
