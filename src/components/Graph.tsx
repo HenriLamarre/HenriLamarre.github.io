@@ -18,6 +18,7 @@ import {
   GLOW_STOPS,
   LINK_OPACITY,
   NODE_COLOURS,
+  STAR_OPACITY,
   SURFACE,
   linkColour,
   nodeColour,
@@ -208,6 +209,11 @@ export default function Graph() {
   const [links, setLinks] = useState<SimLink[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  /**
+   * The star under a pointer. On a phone, where there is no hover, this is how
+   * an application's name gets seen without opening its window.
+   */
+  const [peeked, setPeeked] = useState<string | null>(null)
 
   /** Neighbours of the selected node, for highlighting. */
   const neighbours = useMemo(() => {
@@ -565,6 +571,10 @@ export default function Graph() {
       const simulation = simulationRef.current
       dragRef.current = null
       setDragging(false)
+
+      // The name still lingers: hiding waits before it fades (see the label).
+      setPeeked(null)
+
       if (!drag || !simulation) return
 
       const node = simulation.nodes().find((candidate) => candidate.id === drag.id)
@@ -768,6 +778,13 @@ export default function Graph() {
             const r = RADIUS[node.kind]
             const colour = nodeColour(node.id)
             const glow = GLOW[node.kind]
+            // An application shows its name, at full strength, when it is
+            // hovered (handled in CSS), open, held, or listed in the open
+            // category's window. Once none of those holds, it waits and fades.
+            const revealed =
+              isSelected ||
+              node.id === peeked ||
+              (isNeighbour && selectedNode?.kind === 'category')
 
             return (
               <g
@@ -775,6 +792,7 @@ export default function Graph() {
                 transform={`translate(${node.x ?? 0}, ${node.y ?? 0})`}
                 onPointerDown={(event) => {
                   event.stopPropagation()
+                  setPeeked(node.id)
                   dragRef.current = {
                     id: node.id,
                     moved: 0,
@@ -784,7 +802,7 @@ export default function Graph() {
                   setDragging(true)
                 }}
                 data-star
-                className={`touch-none transition-opacity duration-300 ${
+                className={`group touch-none transition-opacity duration-300 ${
                   dragging ? 'cursor-grabbing' : 'cursor-pointer'
                 }`}
                 opacity={dimmed ? 0.25 : 1}
@@ -793,21 +811,36 @@ export default function Graph() {
                     bloom around it reads as part of the target. */}
                 <circle r={Math.max(18, r * 3)} fill="transparent" />
 
-                {/* The bloom: one wide faint pass, then a tight bright one. */}
-                <circle
-                  r={r + glow.outer}
-                  fill={`url(#${glowId(colour)})`}
-                  opacity={glow.outerOpacity}
-                />
-                <circle r={r + glow.inner} fill={`url(#${glowId(colour)})`} />
+                {/* Applications are faded until hovered or opened. The
+                    value comes through a property so it stays in palette.ts;
+                    hover is a CSS variant, which Tailwind limits to devices
+                    that can hover, so a tap never leaves a star stuck bright. */}
+                <g
+                  className={`opacity-(--star-opacity) transition-opacity group-hover:opacity-100 group-hover:delay-0 group-hover:duration-200 ${
+                    revealed ? 'delay-0 duration-200' : 'delay-2000 duration-1000'
+                  }`}
+                  style={
+                    {
+                      '--star-opacity': revealed ? 1 : STAR_OPACITY[node.kind],
+                    } as React.CSSProperties
+                  }
+                >
+                  {/* The bloom: one wide faint pass, then a tight bright one. */}
+                  <circle
+                    r={r + glow.outer}
+                    fill={`url(#${glowId(colour)})`}
+                    opacity={glow.outerOpacity}
+                  />
+                  <circle r={r + glow.inner} fill={`url(#${glowId(colour)})`} />
 
-                <circle
-                  r={r}
-                  fill={colour}
-                  stroke={isSelected || isNeighbour ? '#ffffff' : 'transparent'}
-                  strokeOpacity={0.5}
-                  strokeWidth={isSelected ? 2 : 1}
-                />
+                  <circle
+                    r={r}
+                    fill={colour}
+                    stroke={isSelected || isNeighbour ? '#ffffff' : 'transparent'}
+                    strokeOpacity={0.5}
+                    strokeWidth={isSelected ? 2 : 1}
+                  />
+                </g>
                 {/* Upper right of the star, clear of its tight bloom. */}
                 <text
                   x={r + LABEL_GAP[node.kind]}
@@ -816,7 +849,14 @@ export default function Graph() {
                   fill={colour}
                   fillOpacity={LABEL_OPACITY[node.kind]}
                   className={`font-pixel select-none ${
-                    node.kind === 'category' ? 'text-base' : 'text-xs'
+                    node.kind === 'category'
+                      ? 'text-base'
+                      : `text-xs transition-opacity ${
+                          // Quick to appear; slow to go, and only after a wait.
+                          revealed
+                            ? 'opacity-100 delay-0 duration-200'
+                            : 'pointer-events-none opacity-0 delay-2000 duration-1000 group-hover:opacity-100 group-hover:delay-0 group-hover:duration-200'
+                        }`
                   }`}
                   style={{ letterSpacing: node.kind === 'category' ? '0.08em' : '0.04em' }}
                 >

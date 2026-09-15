@@ -13,6 +13,23 @@ import { LINKS, NODES } from './data'
 // --- The palette ---
 
 /**
+ * When false, every star wears `STAR_COLOUR`, and categories stand apart from
+ * applications by size and by applications being faded (`STAR_OPACITY`).
+ * When true, each category owns a hue from `CATEGORY_COLOURS` and each
+ * application takes the blend of its categories.
+ */
+const COLOUR_BY_CATEGORY = false
+
+/** The one colour every star wears while `COLOUR_BY_CATEGORY` is off. */
+export const STAR_COLOUR = '#fde68a'
+
+/**
+ * How opaque each kind of star is. A hovered or open application is drawn at
+ * full strength.
+ */
+export const STAR_OPACITY = { category: 1, application: 0.45 } as const
+
+/**
  * One colour per category id in ./data.ts. This object is the whole palette:
  * every application colour, every edge tint and every label is derived from
  * it, so swapping a hex here is all it takes to recolour the graph.
@@ -246,6 +263,8 @@ function categoriesOf(id: string): string[] {
 /** Every star's colour, resolved once at load: the graph never changes shape. */
 export const NODE_COLOURS: Record<string, string> = Object.fromEntries(
   NODES.map((node) => {
+    if (!COLOUR_BY_CATEGORY) return [node.id, STAR_COLOUR]
+
     if (node.kind === 'category') {
       return [node.id, CATEGORY_COLOURS[node.id] ?? FALLBACK]
     }
@@ -271,6 +290,8 @@ const linkColours = new Map<string, string>()
  * subordinate, so the line takes their blend instead.
  */
 export function linkColour(source: string, target: string): string {
+  if (!COLOUR_BY_CATEGORY) return STAR_COLOUR
+
   const key = `${source} ${target}`
   const cached = linkColours.get(key)
   if (cached) return cached
