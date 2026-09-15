@@ -104,3 +104,32 @@ body {
      of truth; this only covers the moment before React paints. */
   background: #07070a;
 }
+
+/* The minigame's payoff: each star swells and flares as the wave reaches it,
+   and each edge brightens. Timing and delays are set from Graph.tsx. */
+@keyframes star-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@keyframes link-pulse {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}

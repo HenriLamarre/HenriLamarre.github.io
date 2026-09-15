@@ -134,12 +134,38 @@ const POINTER_DECAY = 0.6
 /** Keeps the layout ticking briefly after the cursor stops. */
 const POINTER_IDLE_MS = 220
 
+/**
+ * Once an application's name is no longer wanted, it waits NAME_HIDE_DELAY_MS
+ * and then fades over NAME_FADE_MS. Appearing always takes NAME_SHOW_MS. These
+ * drive both the CSS transitions and the minigame's idea of what is on screen,
+ * so the two cannot drift apart.
+ */
+const NAME_HIDE_DELAY_MS = 5000
+const NAME_FADE_MS = 1000
+const NAME_SHOW_MS = 200
+
+/**
+ * The minigame: get every application's name on screen at once, and a wave of
+ * glow rolls across the sky from the star that finished the set. A name still
+ * waiting or fading counts — if it can be seen, it counts.
+ */
+const PULSE_MS = 1400
+/** How fast the wave travels outward, in px per ms. */
+const PULSE_SPEED = 0.8
+
 type SimNode = SimulationNodeDatum & GraphNode
 type SimLink = SimulationLinkDatum<SimNode>
 
 /** Link endpoints are ids before the simulation resolves them to objects. */
 function endpointId(endpoint: SimLink['source']): string {
   return typeof endpoint === 'object' ? (endpoint as SimNode).id : String(endpoint)
+}
+
+/** Appear at once; once no longer wanted, wait, then fade slowly. */
+function nameTiming(revealed: boolean): React.CSSProperties {
+  return revealed
+    ? { transitionDelay: '0ms', transitionDuration: `${NAME_SHOW_MS}ms` }
+    : { transitionDelay: `${NAME_HIDE_DELAY_MS}ms`, transitionDuration: `${NAME_FADE_MS}ms` }
 }
 
 /** Gradient id for a colour's bloom, shared by every star wearing it. */
@@ -214,6 +240,21 @@ export default function Graph() {
    * an application's name gets seen without opening its window.
    */
   const [peeked, setPeeked] = useState<string | null>(null)
+  /** The star under a mouse. Touch has no hover, so it never sets this. */
+  const [hovered, setHovered] = useState<string | null>(null)
+  /** A running minigame pulse, with when the wave reaches each star. */
+  const [pulse, setPulse] = useState<{
+    key: number
+    delays: Map<string, number>
+    length: number
+  } | null>(null)
+  /**
+   * For each application, when its name stopped being wanted — Infinity while
+   * it still is. This is how the minigame knows what is still on screen.
+   */
+  const hiddenSinceRef = useRef(new Map<string, number>())
+  /** Spent by a win; a name that has fully gone and comes back re-arms it. */
+  const pulseArmedRef = useRef(true)
 
   /** Neighbours of the selected node, for highlighting. */
   const neighbours = useMemo(() => {
@@ -624,6 +665,87 @@ export default function Graph() {
   /** Every application, in data order — what prev/next cycles through. */
   const applications = useMemo(() => NODES.filter((node) => node.kind === 'application'), [])
 
+  /**
+   * Applications whose names are wanted right now: hovered, held, open, or
+   * listed in the open category's window.
+   */
+  const revealedIds = useMemo(() => {
+    const selectedKind = NODES.find((node) => node.id === selected)?.kind
+    const ids = new Set<string>()
+
+    for (const application of applications) {
+      if (
+        application.id === selected ||
+        application.id === peeked ||
+        application.id === hovered ||
+        (selectedKind === 'category' && neighbours.has(application.id))
+      ) {
+        ids.add(application.id)
+      }
+    }
+
+    return ids
+  }, [applications, selected, peeked, hovered, neighbours])
+
+  // Keep score. Only a reveal can complete the set, so checking whenever the
+  // reveal set changes is enough — names timing out need no timer.
+  useEffect(() => {
+    const now = performance.now()
+    const onScreenAfter = now - NAME_HIDE_DELAY_MS - NAME_FADE_MS
+    const hiddenSince = hiddenSinceRef.current
+    const newlyRevealed: string[] = []
+
+    for (const application of applications) {
+      const since = hiddenSince.get(application.id)
+
+      if (revealedIds.has(application.id)) {
+        if (since !== Infinity) {
+          newlyRevealed.push(application.id)
+          // Back from fully gone: a fresh run, so it can pay out again.
+          if (since === undefined || since <= onScreenAfter) pulseArmedRef.current = true
+        }
+        hiddenSince.set(application.id, Infinity)
+      } else if (since === Infinity) {
+        hiddenSince.set(application.id, now)
+      }
+    }
+
+    const complete = applications.every(
+      (application) => (hiddenSince.get(application.id) ?? -Infinity) > onScreenAfter,
+    )
+    if (!complete || newlyRevealed.length === 0 || !pulseArmedRef.current) return
+
+    const simulation = simulationRef.current
+    if (!simulation) return
+    pulseArmedRef.current = false
+
+    // The wave starts from the star last touched, and reaches each other star
+    // in proportion to its distance.
+    const originId = peeked ?? hovered ?? selected ?? newlyRevealed[0]
+    const stars = simulation.nodes()
+    const origin = stars.find((star) => star.id === originId)
+    const delays = new Map<string, number>()
+    let furthest = 0
+
+    for (const star of stars) {
+      const distance = origin
+        ? Math.hypot((star.x ?? 0) - (origin.x ?? 0), (star.y ?? 0) - (origin.y ?? 0))
+        : 0
+      const delay = distance / PULSE_SPEED
+      delays.set(star.id, delay)
+      furthest = Math.max(furthest, delay)
+    }
+
+    setPulse({ key: now, delays, length: furthest + PULSE_MS })
+  }, [applications, revealedIds, peeked, hovered, selected])
+
+  // Retire the pulse once the wave has passed the furthest star.
+  useEffect(() => {
+    if (!pulse) return
+    const timer = window.setTimeout(() => setPulse(null), pulse.length)
+    return () => window.clearTimeout(timer)
+  }, [pulse])
+
   /** For an application, the categories it belongs to — its breadcrumb. */
   const parentCategories = useMemo(() => {
     const node = NODES.find((candidate) => candidate.id === selected)
@@ -770,6 +892,34 @@ export default function Graph() {
           })}
         </g>
 
+        {/* The wave runs along the edges too, each lighting as the wave
+            passes its midpoint. */}
+        {pulse && (
+          <g key={pulse.key} className="pointer-events-none">
+            {links.map((link, i) => {
+              const source = link.source as SimNode
+              const target = link.target as SimNode
+              if (typeof source !== 'object' || typeof target !== 'object') return null
+
+              const delay =
+                ((pulse.delays.get(source.id) ?? 0) + (pulse.delays.get(target.id) ?? 0)) / 2
+
+              return (
+                <line
+                  key={i}
+                  x1={source.x}
+                  y1={source.y}
+                  x2={target.x}
+                  y2={target.y}
+                  stroke={linkColour(source.id, target.id)}
+                  strokeWidth={1.6}
+                  style={{ animation: `link-pulse ${PULSE_MS}ms ease-out ${delay}ms both` }}
+                />
+              )
+            })}
+          </g>
+        )}
+
         <g>
           {nodes.map((node) => {
             const isSelected = node.id === selected
@@ -778,13 +928,9 @@ export default function Graph() {
             const r = RADIUS[node.kind]
             const colour = nodeColour(node.id)
             const glow = GLOW[node.kind]
-            // An application shows its name, at full strength, when it is
-            // hovered (handled in CSS), open, held, or listed in the open
-            // category's window. Once none of those holds, it waits and fades.
-            const revealed =
-              isSelected ||
-              node.id === peeked ||
-              (isNeighbour && selectedNode?.kind === 'category')
+            // Wanted applications show their name at full strength; the rest
+            // wait, then fade. Categories are never in the set.
+            const revealed = revealedIds.has(node.id)
 
             return (
               <g
@@ -801,8 +947,14 @@ export default function Graph() {
                   }
                   setDragging(true)
                 }}
+                onPointerEnter={(event) => {
+                  if (event.pointerType !== 'touch') setHovered(node.id)
+                }}
+                onPointerLeave={() =>
+                  setHovered((current) => (current === node.id ? null : current))
+                }
                 data-star
-                className={`group touch-none transition-opacity duration-300 ${
+                className={`touch-none transition-opacity duration-300 ${
                   dragging ? 'cursor-grabbing' : 'cursor-pointer'
                 }`}
                 opacity={dimmed ? 0.25 : 1}
@@ -811,17 +963,30 @@ export default function Graph() {
                     bloom around it reads as part of the target. */}
                 <circle r={Math.max(18, r * 3)} fill="transparent" />
 
-                {/* Applications are faded until hovered or opened. The
-                    value comes through a property so it stays in palette.ts;
-                    hover is a CSS variant, which Tailwind limits to devices
-                    that can hover, so a tap never leaves a star stuck bright. */}
+                {/* The minigame's payoff: a swell of glow, reaching each star
+                    in turn as the wave passes it. */}
+                {pulse && (
+                  <circle
+                    key={pulse.key}
+                    r={r + glow.outer}
+                    fill={`url(#${glowId(colour)})`}
+                    className="pointer-events-none"
+                    style={{
+                      transformBox: 'fill-box',
+                      transformOrigin: 'center',
+                      animation: `star-pulse ${PULSE_MS}ms ease-out ${pulse.delays.get(node.id) ?? 0}ms both`,
+                    }}
+                  />
+                )}
+
+                {/* Applications are faded until wanted. The value comes
+                    through a property so it stays in palette.ts. */}
                 <g
-                  className={`opacity-(--star-opacity) transition-opacity group-hover:opacity-100 group-hover:delay-0 group-hover:duration-200 ${
-                    revealed ? 'delay-0 duration-200' : 'delay-2000 duration-1000'
-                  }`}
+                  className="opacity-(--star-opacity) transition-opacity"
                   style={
                     {
                       '--star-opacity': revealed ? 1 : STAR_OPACITY[node.kind],
+                      ...nameTiming(revealed),
                     } as React.CSSProperties
                   }
                 >
@@ -852,13 +1017,13 @@ export default function Graph() {
                     node.kind === 'category'
                       ? 'text-base'
                       : `text-xs transition-opacity ${
-                          // Quick to appear; slow to go, and only after a wait.
-                          revealed
-                            ? 'opacity-100 delay-0 duration-200'
-                            : 'pointer-events-none opacity-0 delay-2000 duration-1000 group-hover:opacity-100 group-hover:delay-0 group-hover:duration-200'
+                          revealed ? 'opacity-100' : 'pointer-events-none opacity-0'
                         }`
                   }`}
-                  style={{ letterSpacing: node.kind === 'category' ? '0.08em' : '0.04em' }}
+                  style={{
+                    letterSpacing: node.kind === 'category' ? '0.08em' : '0.04em',
+                    ...(node.kind === 'application' ? nameTiming(revealed) : {}),
+                  }}
                 >
                   {t(node.name)}
                 </text>
